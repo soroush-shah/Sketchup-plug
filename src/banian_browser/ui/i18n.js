@@ -2,6 +2,11 @@
 (function () {
   'use strict';
   var fa = {
+    import_preview: 'ایمپورت با پیش‌نمایش و کاهش پلیگان', import_simplify: 'ایمپورت و ساده‌سازی (پیش‌نمایش)',
+    import_model: 'ایمپورت مدل سه‌بعدی', simplify_sel: 'ساده‌سازی انتخاب', px_decimated: 'پراکسی دقیق (کاهش پلیگان)',
+    tp_import: 'ایمپورت و کاهش پلیگان', tp_import_hint: 'فرمت‌های GLB، glTF، FBX، OBJ، DAE، 3DS، STL، PLY، VRML، USDZ و SKP را با پیش‌نمایش سه‌بعدی، تنظیم واحد و جهت، و کاهش پلیگان ایمپورت کنید. گروه‌ها و کامپوننت‌های داخل مدل را هم می‌توانید سبک کنید.',
+    replace_tex_tool: 'ابزار جایگزینی تکسچر', replace_tex_hint: 'جایگزینی تکسچر: متریال فعلی را انتخاب کنید و روی سطحی کلیک کنید؛ همه سطوح هم‌متریال آن گروه با حفظ UV عوض می‌شوند (Shift: در کل مدل).',
+    import_mat_file: 'ایمپورت متریال / تصویر', import_folder_mats: 'ایمپورت پوشه تصاویر به عنوان متریال', convert_failed: 'تبدیل تصویر ممکن نشد',
     v_models: 'مدل‌ها', v_materials: 'متریال‌ها', v_favorites: 'محبوب‌ها', v_recent: 'اخیر', v_inmodel: 'در مدل',
     v_tools: 'ابزارها', v_proxy: 'پراکسی', v_settings: 'تنظیمات',
     ok: 'تأیید', cancel: 'انصراف', delete: 'حذف', rename: 'تغییر نام', refresh: 'بروزرسانی', done: 'انجام شد', change: 'تغییر',
@@ -76,6 +81,11 @@
     shortcuts: 'میانبرها: <span class="kbd">Ctrl+F</span> جستجو · راست‌کلیک روی کارت‌ها و پوشه‌ها برای همه گزینه‌ها · کشیدن کارت روی پوشه برای جابه‌جایی'
   };
   var en = {
+    import_preview: 'Import with preview & polygon reduction', import_simplify: 'Import & simplify (preview)',
+    import_model: 'Import 3D model', simplify_sel: 'Simplify selection', px_decimated: 'Accurate proxy (polygon reduction)',
+    tp_import: 'Import & polygon reduction', tp_import_hint: 'Import GLB, glTF, FBX, OBJ, DAE, 3DS, STL, PLY, VRML, USDZ and SKP with a 3D preview, units and orientation, and polygon reduction. You can also lighten groups and components already in the model.',
+    replace_tex_tool: 'Replace Textures tool', replace_tex_hint: 'Replace Textures: pick the current material, then click a face; all faces with that material in the same group change and keep their UVs (Shift: whole model).',
+    import_mat_file: 'Import material / image', import_folder_mats: 'Import folder of images as materials', convert_failed: 'Could not convert the image',
     v_models: 'Models', v_materials: 'Materials', v_favorites: 'Favorites', v_recent: 'Recent', v_inmodel: 'In Model',
     v_tools: 'Tools', v_proxy: 'Proxy', v_settings: 'Settings',
     ok: 'OK', cancel: 'Cancel', delete: 'Delete', rename: 'Rename', refresh: 'Refresh', done: 'Done', change: 'Change',

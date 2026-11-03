@@ -238,7 +238,7 @@ module BanianStudio
           bases = {}
           files.each do |n|
             e = File.extname(n).downcase
-            bases[n.sub(/\.[^.]+\z/, '').downcase] = true if e == '.skp' || e == '.skm'
+            bases[n.sub(/\.[^.]+\z/, '').downcase] = true if e == '.skp' || e == '.skm' || Util::MESH_EXTS.include?(e)
           end
           files.each do |n|
             ext = File.extname(n).downcase

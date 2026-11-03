@@ -1,3 +1,4 @@
+# encoding: UTF-8
 module BanianStudio
   module BanianBrowser
     # Material import, picking, replacing, saving and model-material listing.
@@ -56,21 +57,117 @@ module BanianStudio
           mat
         end
 
+        # Formats SketchUp reads directly; others (webp, gif) are converted to PNG by the
+        # dialog first (see Commands#cmd_save_converted).
+        NATIVE_IMAGES = %w[.jpg .jpeg .png .bmp .tif .tiff .tga].freeze
+
+        def converted_file(path)
+          File.join(Settings.sub_dir('converted'), Thumbnails.key_for(path) + '.png')
+        end
+
+        def needs_conversion?(path)
+          !NATIVE_IMAGES.include?(File.extname(path).downcase)
+        end
+
+        # "Oak_120x60cm.jpg" / "tile 60x60 mm.png" / "marble-1.2x0.6m.jpg" -> [w, h] in inches
+        def size_from_name(name)
+          m = name.match(/(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)\b/i)
+          return nil unless m
+          f = { 'mm' => 0.1, 'cm' => 1.0, 'm' => 100.0 }[m[3].downcase]
+          [Util.cm_to_in(m[1].tr(',', '.').to_f * f), Util.cm_to_in(m[2].tr(',', '.').to_f * f)]
+        end
+
         def material_from_image(path)
           base = File.basename(path, '.*')
+          file = path
+          if needs_conversion?(path)
+            file = converted_file(path)
+            raise ArgumentError, "#{File.basename(path)}: #{I18n.t(:format_unsupported)}" unless File.file?(file)
+          end
           existing = model.materials.find do |m|
-            m.texture && Util.norm(m.texture.filename.to_s) == path
+            m.texture && [path, file].include?(Util.norm(m.texture.filename.to_s))
           end
           return existing if existing
           mat = model.materials.add(base)
-          mat.texture = path
+          mat.texture = file
           tex = mat.texture
           if tex && tex.image_width.to_i > 0
-            w = Util.cm_to_in(Settings['image_width_cm'].to_f > 0 ? Settings['image_width_cm'] : 100)
-            h = w * tex.image_height.to_f / tex.image_width.to_f
-            tex.size = [w, h]
+            size = size_from_name(base)
+            if size
+              tex.size = size
+            else
+              w = Util.cm_to_in(Settings['image_width_cm'].to_f > 0 ? Settings['image_width_cm'] : 100)
+              tex.size = [w, w * tex.image_height.to_f / tex.image_width.to_f]
+            end
           end
           mat
+        end
+
+        # Imports every image / .skm of a folder (and its sub-folders) as model materials.
+        def import_folder(folder, recursive = true)
+          pattern = recursive ? File.join(folder, '**', '*') : File.join(folder, '*')
+          files = Dir.glob(pattern.gsub(/[\[\]{}]/) { |c| "\\#{c}" }).select do |f|
+            e = File.extname(f).downcase
+            (NATIVE_IMAGES.include?(e) || e == '.skm') && File.file?(f)
+          end
+          return 0 if files.empty?
+          n = 0
+          model.start_operation(I18n.t(:op_import_mat), true)
+          files.each do |f|
+            begin
+              f = Util.norm(f)
+              if File.extname(f).downcase == '.skm'
+                model.materials.load(f) if model.materials.respond_to?(:load)
+              else
+                material_from_image(f)
+              end
+              n += 1
+            rescue StandardError => e
+              Util.log_error(e, 'import folder')
+            end
+          end
+          model.commit_operation
+          n
+        end
+
+        # ---- swapping materials while keeping the UV mapping (Replace Textures) ------
+        def swap_face(face, front, dst, tw)
+          old = front ? face.material : face.back_material
+          keep = old && old.texture && dst.texture
+          if keep
+            pts, uvs = TextureTools.sample(face, front, tw)
+          end
+          if front
+            face.material = dst
+          else
+            face.back_material = dst
+          end
+          TextureTools.apply(face, front, pts, uvs) if keep
+          true
+        rescue StandardError => e
+          Util.log_error(e, 'swap face')
+          false
+        end
+
+        def swap_in(entities, src, dst)
+          tw = Sketchup.create_texture_writer
+          n = 0
+          entities.to_a.each do |e|
+            if e.is_a?(Sketchup::Face)
+              n += 1 if e.material == src && swap_face(e, true, dst, tw)
+              n += 1 if e.back_material == src && swap_face(e, false, dst, tw)
+            elsif e.respond_to?(:material=) && !e.is_a?(Sketchup::Edge) && e.material == src
+              e.material = dst
+              n += 1
+            end
+          end
+          n
+        end
+
+        def swap_everywhere(src, dst)
+          n = swap_in(model.entities, src, dst)
+          model.definitions.each { |d| n += swap_in(d.entities, src, dst) unless d.image? }
+          n
         end
 
         # Click on a material card: import it and give the user a paint bucket.

@@ -7,6 +7,7 @@ module BanianStudio
       IMAGE_EXTS = %w[.jpg .jpeg .png .bmp .gif .tif .tiff .tga .webp].freeze
       WEB_IMAGE_EXTS = %w[.jpg .jpeg .png .bmp .gif .webp].freeze
       SIDECAR_EXTS = %w[.png .jpg .jpeg .webp .bmp].freeze
+      MESH_EXTS = %w[.glb .gltf .fbx .obj .dae .3ds .stl .ply .wrl .vrml .usdz].freeze
 
       module_function
 
@@ -84,6 +85,7 @@ module BanianStudio
         return 'model' if MODEL_EXTS.include?(e)
         return 'material' if MATERIAL_EXTS.include?(e)
         return 'texture' if IMAGE_EXTS.include?(e)
+        return 'mesh' if MESH_EXTS.include?(e)
         nil
       end
 

@@ -71,6 +71,8 @@ File.binwrite(File.join(lib, 'Furniture', 'Table.skp'), header + ('z' * 100).b)
 File.binwrite(File.join(lib, 'Furniture', 'Table.jpg'), 'jpg-sidecar')
 File.binwrite(File.join(lib, 'Materials', 'Wood', 'Oak.jpg'), 'jpg')
 File.binwrite(File.join(lib, 'Materials', 'Wood', 'readme.txt'), 'x')
+File.binwrite(File.join(lib, 'Furniture', 'Lamp.fbx'), 'fbx')
+File.binwrite(File.join(lib, 'Furniture', 'Lamp.png'), 'sidecar')
 File.binwrite(File.join(lib, '.hidden', 'Secret.skp'), header)
 # a real zip (.skm) made with Ruby's zlib (raw deflate)
 def make_zip(path, files)
@@ -107,12 +109,13 @@ ev = BB::Dialog.events.select { |e, _| e == 'index' }.last
 idx = ev && ev[1]
 check('scan produced an index', idx.is_a?(Hash))
 names = idx['items'].map { |i| i['n'] }.sort
-check('items found (sidecar + hidden + txt skipped)', names == ['Oak', 'Table', 'Walnut', 'صندلی Chair'])
+check('items found (sidecar + hidden + txt skipped)', names == ['Lamp', 'Oak', 'Table', 'Walnut', 'صندلی Chair'])
+check('3D formats listed as mesh', idx['items'].find { |i| i['n'] == 'Lamp' }['k'] == 'mesh')
 check('folders become categories', idx['folders'].map { |f| f['n'] }.sort == %w[Chairs Furniture Materials Wood])
 chair = idx['items'].find { |i| i['n'] == 'صندلی Chair' }
 check('model kind + version stored', chair['k'] == 'model' && chair['v'] == 24)
 check('texture kind', idx['items'].find { |i| i['n'] == 'Oak' }['k'] == 'texture')
-check('index cached on disk', BB::Library.cached_index(lib)['items'].length == 4)
+check('index cached on disk', BB::Library.cached_index(lib)['items'].length == 5)
 
 u = BB::Thumbnails.resolve(skp)
 check('skp embedded png extracted', u && File.binread(BB::Thumbnails.cache_file(skp)) == png)

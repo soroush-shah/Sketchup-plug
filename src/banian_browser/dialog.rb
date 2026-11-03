@@ -231,6 +231,7 @@ module BanianStudio
 
         # ---- models --------------------------------------------------------------------
         def cmd_place(a)
+          return Importer.open_file(a['path']) && true if Util.kind_of_ext(File.extname(a['path'].to_s)) == 'mesh'
           ModelOps.place(a['path'], a['mode'])
         end
 
@@ -353,6 +354,60 @@ module BanianStudio
           MaterialOps.set_props(a['name'], a['props'] || {})
         end
 
+        # ---- importer (Skimp-style) / replace textures / image conversion ----------------
+        def cmd_import_file(a)
+          Importer.open_file(a['path'])
+          true
+        end
+
+        def cmd_import_browse(_a)
+          Importer.browse_and_open
+          true
+        end
+
+        def cmd_simplify_sel(_a)
+          Importer.open_selection('simplify')
+          true
+        end
+
+        def cmd_replace_tex_tool(_a)
+          model.select_tool(ReplaceTextureTool.new)
+          true
+        end
+
+        def cmd_import_mat_file(_a)
+          f = UI.openpanel(I18n.t(:import_mat_file), Settings['last_save_dir'].to_s,
+                           'Materials|*.skm;*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff;*.tga;*.gif;*.webp||')
+          return nil unless f
+          f = Util.norm(f)
+          return { 'convert' => f } if MaterialOps.needs_conversion?(f) && File.extname(f).downcase != '.skm' &&
+                                       !File.file?(MaterialOps.converted_file(f))
+          MaterialOps.import_and_paint(f)
+        end
+
+        def cmd_import_mat_folder(a)
+          folder = folder_arg(a)
+          folder ? MaterialOps.import_folder(folder) : nil
+        end
+
+        # Image formats SketchUp cannot read are converted to PNG by the dialog.
+        def cmd_needs_convert(a)
+          p = Util.norm(a['path'])
+          MaterialOps.needs_conversion?(p) && !File.file?(MaterialOps.converted_file(p))
+        end
+
+        def cmd_read_b64(a)
+          p = Util.norm(a['path'])
+          return nil unless File.file?(p) && File.size(p) < 64 * 1024 * 1024
+          [File.binread(p)].pack('m0')
+        end
+
+        def cmd_save_converted(a)
+          p = Util.norm(a['path'])
+          File.open(MaterialOps.converted_file(p), 'wb') { |f| f.write(a['png'].to_s.unpack('m0')[0]) }
+          true
+        end
+
         # ---- texture positioning --------------------------------------------------------
         def cmd_tex(a)
           v = a['value']
@@ -381,6 +436,7 @@ module BanianStudio
           when 'open' then Proxy.open_source
           when 'regular' then Proxy.make_regular
           when 'place' then Proxy.place_as_proxy(a['path'])
+          when 'decimated' then Importer.open_selection('proxy')
           when 'choose_dir'
             d = choose_folder(:choose_folder)
             Settings['proxy_dir'] = d if d

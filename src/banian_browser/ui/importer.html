@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Banian Import</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  #imp { display: flex; height: 100%; }
+  #view { flex: 1; position: relative; min-width: 0; background: var(--thumb-bg); }
+  #view canvas { display: block; width: 100%; height: 100%; outline: none; }
+  #ov { position: absolute; top: 10px; left: 12px; right: 12px; pointer-events: none; display: flex; flex-wrap: wrap; align-items: flex-start; }
+  #ov .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 5px 10px; margin: 0 6px 6px 0; box-shadow: var(--shadow); font-size: 12px; }
+  #ov .chip b { color: var(--accent); }
+  #vtools { position: absolute; bottom: 12px; left: 12px; display: flex; }
+  #vtools .btn { margin-right: 6px; background: var(--panel); }
+  #busy { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; min-width: 260px; box-shadow: 0 10px 30px rgba(0,0,0,.18); text-align: center; }
+  #busy .bar { height: 6px; border-radius: 4px; background: var(--line); margin-top: 10px; overflow: hidden; }
+  #busy .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+  #side2 { width: 330px; flex: none; background: var(--panel); border-inline-start: 1px solid var(--line); -webkit-border-start: 1px solid var(--line); display: flex; flex-direction: column; }
+  #side2 .scroll { flex: 1; overflow: auto; padding: 12px 14px; }
+  #side2 h2 { font-size: 15px; margin: 0 0 2px; word-break: break-word; }
+  #side2 .sub { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .sec { border-top: 1px solid var(--line); padding: 10px 0 6px; }
+  .sec h4 { margin: 0 0 6px; font-size: 13px; display: flex; align-items: center; }
+  .sec h4 svg.i { color: var(--accent); margin-inline-end: 6px; -webkit-margin-end: 6px; }
+  .num { direction: ltr; display: inline-block; }
+  #pct { width: 100%; accent-color: var(--accent); }
+  .big { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .foot { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; }
+  .foot .btn { flex: 1; justify-content: center; height: 36px; margin: 0 3px; }
+  .warn { color: var(--warn); font-size: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 2.8 20.5 7.5v9L12 21.2 3.5 16.5v-9z M3.5 7.5 12 12.2l8.5-4.7 M12 12.2v9"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11 M7 10.5l5 5 5-5 M5 20h14"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3 M12 18.5v3 M2.5 12h3 M18.5 12h3 M5.3 5.3l2.1 2.1 M16.6 16.6l2.1 2.1 M5.3 18.7l2.1-2.1 M16.6 7.4l2.1-2.1"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5 M8 8h8v8H8z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4z M4 12h16 M12 4v16 M4 8h16 M4 16h16 M8 4v16 M16 4v16"/></symbol>
+  <symbol id="i-swatch" viewBox="0 0 24 24"><path d="M4 4h7v16H6a2 2 0 0 1-2-2z M11 8.5l4.6-4.6 4.6 4.6-9.2 9.2 M11 20h9v-7h-4"/></symbol>
+</svg>
+<div id="imp">
+  <div id="view">
+    <div id="ov"></div>
+    <div id="vtools"></div>
+    <div id="busy"><div id="busy-t">…</div><div class="bar"><i id="busy-b"></i></div></div>
+  </div>
+  <div id="side2"><div class="scroll" id="panel"></div><div class="foot" id="foot"></div></div>
+</div>
+<div id="toast"></div>
+<script src="lib/fflate.min.js"></script>
+<script>window.pako = { inflateRaw: function (d) { return window.fflate.inflateSync(d); } };</script>
+<script src="lib/chevrotain.min.js"></script>
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="lib/FBXLoader.js"></script>
+<script src="lib/ColladaLoader.js"></script>
+<script src="lib/MTLLoader.js"></script>
+<script src="lib/OBJLoader.js"></script>
+<script src="lib/STLLoader.js"></script>
+<script src="lib/PLYLoader.js"></script>
+<script src="lib/TDSLoader.js"></script>
+<script src="lib/VRMLLoader.js"></script>
+<script src="lib/TGALoader.js"></script>
+<script src="lib/utif.js"></script>
+<script src="lib/TIFFLoader.js"></script>
+<script src="lib/USDZLoader.js"></script>
+<script src="decimate.js"></script>
+<script src="importer.js"></script>
+</body>
+</html>

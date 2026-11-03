@@ -25,7 +25,17 @@ module BanianStudio
         'tex_include_groups' => true,
         'tex_nudge' => 0.1,
         'last_save_dir' => '',
-        'show_ext' => false
+        'show_ext' => false,
+        'import_ratio' => 100,     # % of faces kept when importing files
+        'simplify_ratio' => 50,    # % kept when simplifying model geometry / skp
+        'proxy_ratio' => 10,       # % kept for accurate (decimated) proxies
+        'import_tolerance' => 0.5, # cm
+        'import_use_tol' => false,
+        'import_keep_seams' => true,
+        'import_keep_borders' => true,
+        'import_flat' => false,
+        'import_components' => true,
+        'import_tint' => false
       }.freeze
 
       MAX_RECENT = 80

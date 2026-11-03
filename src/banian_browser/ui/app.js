@@ -88,6 +88,7 @@
     if (e === 'skp') return 'model';
     if (e === 'skm') return 'material';
     if (['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tif', 'tiff', 'tga', 'webp'].indexOf(e) >= 0) return 'texture';
+    if (MESH_EXTS.indexOf(e) >= 0) return 'mesh';
     return null;
   }
   function fmtSize(b) {
@@ -103,7 +104,9 @@
   }
   function suYear(v) { return v >= 13 ? 2000 + v : v; }
   function isMatView() { return S.view === 'materials'; }
-  function catOf(it) { return it.k === 'model' ? 'model' : 'mat'; }
+  var MESH_EXTS = ['glb', 'gltf', 'fbx', 'obj', 'dae', '3ds', 'stl', 'ply', 'wrl', 'vrml', 'usdz'];
+  function isModelKind(it) { return it.k === 'model' || it.k === 'mesh'; }
+  function catOf(it) { return isModelKind(it) ? 'model' : 'mat'; }
   function viewCat() { return S.view === 'models' ? 'model' : 'mat'; }
   function rootVisible(r, cat) { return r.type === 'both' || (cat === 'model' ? r.type === 'models' : r.type === 'materials'); }
   function favSet() {
@@ -344,7 +347,7 @@
   }
 
   function phHtml(it) {
-    var ic = it.k === 'model' ? 'cube' : 'swatch';
+    var ic = isModelKind(it) ? 'cube' : 'swatch';
     return '<div class="ph">' + icon(ic) + '<span>' + esc((it.e || '').toUpperCase()) + '</span></div>';
   }
 
@@ -563,10 +566,17 @@
     if (hasTree() && S.folder[v]) {
       h += '<button class="btn" data-act="mkdir" title="' + esc(t('new_folder')) + '">' + icon('folder-plus') + '</button>';
       if (v === 'models') h += '<button class="btn" data-act="save-sel-here" title="' + esc(t('save_sel_here_tip')) + '">' + icon('save') + '<span>' + esc(t('save_sel_here')) + '</span></button>';
+      if (v === 'materials') h += '<button class="btn" data-act="import-mat-folder" title="' + esc(t('import_folder_mats')) + '">' + icon('plus') + '</button>';
       if (v === 'materials') h += '<button class="btn" data-act="save-mat-here" title="' + esc(t('save_mat_here_tip')) + '">' + icon('save') + '<span>' + esc(t('save_mat_here')) + '</span></button>';
     }
     if (v === 'inmodel') {
       h += '<button class="btn" data-act="mm-purge">' + esc(t('purge_unused')) + '</button>';
+    }
+    if (v === 'materials' || v === 'inmodel') {
+      h += '<button class="btn" data-act="import-mat-file">' + icon('plus') + '<span>' + esc(t('import_mat_file')) + '</span></button>';
+    }
+    if (v === 'models') {
+      h += '<button class="btn" data-act="import-browse">' + icon('cube') + '<span>' + esc(t('import_model')) + '</span></button>';
     }
     c.innerHTML = h;
   }
@@ -624,7 +634,7 @@
     for (var i = start; i < end; i++) {
       var it = S.list[i];
       var card = document.createElement('div');
-      card.className = 'card' + (it.k === 'model' ? '' : ' mat');
+      card.className = 'card' + (isModelKind(it) ? '' : ' mat');
       card.setAttribute('data-i', i);
       card.setAttribute('data-p', it.p);
       card.setAttribute('draggable', 'true');
@@ -635,6 +645,8 @@
       var ver = '';
       if (it.k === 'model' && it.v) {
         ver = '<span class="ver' + (it.v > S.info.su ? ' new' : '') + '">' + suYear(it.v) + '</span>';
+      } else if (it.k === 'mesh') {
+        ver = '<span class="ver">' + esc(it.e.toUpperCase()) + '</span>';
       }
       var showExt = S.settings.show_ext ? ' <span class="ext">.' + esc(it.e) + '</span>' : '';
       card.innerHTML = '<div class="th" style="height:' + size + 'px"></div>' + ver +
@@ -699,11 +711,20 @@
       '<button class="btn" data-tool="surface">' + icon('cube') + '<span>' + esc(t('pm_surface')) + '</span></button></div>' +
       '<div class="hint">' + t('tp_keys') + '</div>' +
       '<div class="row"><label class="l">' + esc(t('rotate_step')) + '</label><input class="inp sm" type="number" id="rot-step" value="' + (S.settings.rotate_step || 45) + '"> °</div></div>';
+    // import & simplify (Skimp-style)
+    h += '<div class="panel"><h3>' + icon('fit') + esc(t('tp_import')) + '</h3><div class="hint">' + esc(t('tp_import_hint')) + '</div>' +
+      '<div class="row"><button class="btn pri" data-act="import-browse">' + icon('cube') + '<span>' + esc(t('import_model')) + '</span></button>' +
+      '<button class="btn" data-act="simplify-sel">' + icon('fit') + '<span>' + esc(t('simplify_sel')) + '</span></button>' +
+      '<button class="btn" data-act="proxy-dec">' + icon('proxy') + '<span>' + esc(t('px_decimated')) + '</span></button></div></div>';
     // material tools
     h += '<div class="panel"><h3>' + icon('dropper') + esc(t('tp_mat')) + '</h3><div class="hint">' + esc(t('tp_mat_hint')) + '</div>' +
       '<div class="row"><button class="btn pri" data-act="pick">' + icon('dropper') + '<span>' + esc(t('eyedropper')) + '</span></button>' +
       '<button class="btn" data-act="bucket">' + icon('bucket') + '<span>' + esc(t('bucket')) + '</span></button>' +
-      '<button class="btn" data-act="native-paint">' + icon('bucket') + '<span>' + esc(t('native_paint')) + '</span></button></div>' +
+      '<button class="btn" data-act="native-paint">' + icon('bucket') + '<span>' + esc(t('native_paint')) + '</span></button>' +
+      '<button class="btn" data-act="replace-tex">' + icon('refresh') + '<span>' + esc(t('replace_tex_tool')) + '</span></button></div>' +
+      '<div class="hint">' + esc(t('replace_tex_hint')) + '</div>' +
+      '<div class="row"><button class="btn" data-act="import-mat-file">' + icon('plus') + '<span>' + esc(t('import_mat_file')) + '</span></button>' +
+      '<button class="btn" data-act="import-mat-folder">' + icon('folder-plus') + '<span>' + esc(t('import_folder_mats')) + '</span></button></div>' +
       '<div class="row"><button class="btn" data-act="apply-sel">' + esc(t('apply_sel')) + '</button>' +
       '<button class="btn' + (S.replaceArmed ? ' on' : '') + '" data-act="arm-replace">' + esc(t('replace_mode')) + '</button></div>' +
       '<div class="row"><button class="btn" data-act="save-mat">' + icon('save') + '<span>' + esc(t('save_picked')) + '</span></button>' +
@@ -766,6 +787,7 @@
       '<div class="hint">' + esc(t('px_render_hint')) + '</div></div>';
     h += '<div class="panel"><h3>' + icon('cube') + esc(t('px_selection')) + '</h3><div class="hint">' + esc(t('px_sel_hint')) + '</div>' +
       '<div class="row"><button class="btn pri" data-px="make">' + esc(t('px_make')) + '</button>' +
+      '<button class="btn pri" data-px="decimated">' + esc(t('px_decimated')) + '</button>' +
       '<button class="btn" data-px="sel_full">' + esc(t('px_sel_full')) + '</button>' +
       '<button class="btn" data-px="sel_proxy">' + esc(t('px_sel_proxy')) + '</button></div>' +
       '<div class="row"><button class="btn" data-px="open">' + esc(t('px_open')) + '</button>' +
@@ -878,19 +900,44 @@
     S.settings.usage = u;
   }
 
+  // webp / gif are not readable by SketchUp: convert them to PNG once, in this dialog.
+  function ensureConverted(path) {
+    return call('needs_convert', { path: path }).then(function (need) {
+      if (!need) return true;
+      return call('read_b64', { path: path }).then(function (b64) {
+        if (!b64) return false;
+        return new Promise(function (resolve) {
+          var img = new Image();
+          img.onload = function () {
+            var c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            call('save_converted', { path: path, png: c.toDataURL('image/png').split(',')[1] }).then(function () { resolve(true); });
+          };
+          img.onerror = function () { toast(t('convert_failed'), true); resolve(false); };
+          img.src = 'data:image/' + (extOf(path) === 'gif' ? 'gif' : 'webp') + ';base64,' + b64;
+        });
+      });
+    });
+  }
+  function withImage(it, fn) {
+    if (it.k === 'texture' && /^(webp|gif)$/.test(it.e)) ensureConverted(it.p).then(function (ok) { if (ok) fn(); });
+    else fn();
+  }
+
   function activate(it) {
     if (!it) return;
+    if (it.k === 'mesh') { call('import_file', { path: it.p }).then(function () { useRecent(it.p); }); return; }
     if (it.k === 'model') {
       if (it.v && it.v > S.info.su) { toast(t('too_new'), true); return; }
       call('place', { path: it.p, mode: S.settings.place_mode || 'normal' }).then(function (ok) { if (ok) useRecent(it.p); });
     } else if (S.replaceArmed) {
-      call('mat_replace_with', { path: it.p }).then(function (n) {
+      withImage(it, function () { call('mat_replace_with', { path: it.p }).then(function (n) {
         if (n !== null && n !== false) { toast(t('replaced') + (typeof n === 'number' ? ' (' + n + ')' : '')); }
         S.replaceArmed = false;
         renderStatus();
-      });
+      }); });
     } else {
-      call('mat_paint', { path: it.p }).then(function (ok) { if (ok) useRecent(it.p); });
+      withImage(it, function () { call('mat_paint', { path: it.p }).then(function (ok) { if (ok) useRecent(it.p); }); });
     }
   }
 
@@ -946,9 +993,15 @@
       { label: t('rename'), icon: 'save', action: function () { renameItem(it); } },
       { label: t('delete'), icon: 'x', danger: true, action: function () { deleteItems([it.p], it.n); } }
     ];
-    if (it.k === 'model') {
+    if (it.k === 'mesh') {
+      items = [
+        { head: it.n + '.' + it.e },
+        { label: t('import_preview'), icon: 'cube', action: function () { call('import_file', { path: it.p }); } }
+      ];
+    } else if (it.k === 'model') {
       items = [
         { head: it.n },
+        { label: t('import_simplify'), icon: 'fit', action: function () { call('import_file', { path: it.p }); } },
         { label: t('pm_normal_full'), icon: 'cube', action: function () { call('place', { path: it.p, mode: 'normal' }); } },
         { label: t('pm_fit3_full'), icon: 'fit', action: function () { call('place', { path: it.p, mode: 'fit3' }); } },
         { label: t('pm_fit2_full'), icon: 'fit', action: function () { call('place', { path: it.p, mode: 'fit2' }); } },
@@ -965,11 +1018,14 @@
     } else {
       items = [
         { head: it.n },
-        { label: t('paint'), icon: 'bucket', action: function () { call('mat_paint', { path: it.p }); } },
-        { label: t('apply_sel'), icon: 'bucket', action: function () { call('mat_apply', { path: it.p }); } },
-        { label: t('add_to_model'), icon: 'plus', action: function () { call('mat_add', { path: it.p }).then(function (ok) { if (ok) toast(t('added')); }); } },
+        { label: t('paint'), icon: 'bucket', action: function () { withImage(it, function () { call('mat_paint', { path: it.p }); }); } },
+        { label: t('apply_sel'), icon: 'bucket', action: function () { withImage(it, function () { call('mat_apply', { path: it.p }); }); } },
+        { label: t('add_to_model'), icon: 'plus', action: function () { withImage(it, function () { call('mat_add', { path: it.p }).then(function (ok) { if (ok) toast(t('added')); }); }); } },
         { label: t('replace_picked'), icon: 'refresh', disabled: !S.picked, action: function () {
-          call('mat_replace_with', { path: it.p }).then(function (n) { if (n !== null && n !== false) toast(t('replaced')); });
+          withImage(it, function () { call('mat_replace_with', { path: it.p }).then(function (n) { if (n !== null && n !== false) toast(t('replaced')); }); });
+        } },
+        { label: t('replace_tex_tool'), icon: 'bucket', action: function () {
+          withImage(it, function () { call('mat_add', { path: it.p }).then(function (ok) { if (ok) call('replace_tex_tool'); }); });
         } }
       ];
     }
@@ -1000,6 +1056,9 @@
     if (S.view === 'models') items.push({ label: t('save_model_here'), icon: 'save', action: function () { call('save_model', { folder: p }); } });
     if (S.view === 'materials') items.push({ label: t('save_mat_here'), icon: 'save', action: function () { call('model_mat_save', { folder: p }); } });
     if (S.view === 'materials') items.push({ label: t('export_all_here'), icon: 'save', action: function () { call('export_mats', { folder: p }); } });
+    if (S.view === 'materials') items.push({ label: t('import_folder_mats'), icon: 'plus', action: function () {
+      call('import_mat_folder', { folder: p }).then(function (n) { if (n) toast(t('added') + ' (' + n + ')'); });
+    } });
     items.push({ sep: true });
     if (isRoot) {
       items.push({ label: t('rename_lib'), icon: 'save', action: function () {
@@ -1276,6 +1335,19 @@
       case 'pm-apply': applyPicked(); break;
       case 'clear-cache': call('clear_thumb_cache').then(function () { S.thumbs = {}; S.requested = {}; toast(t('done')); }); break;
       case 'reset-window': call('reset_window'); break;
+      case 'import-browse': call('import_browse'); break;
+      case 'simplify-sel': call('simplify_sel'); break;
+      case 'proxy-dec': call('proxy', { op: 'decimated' }); break;
+      case 'replace-tex': call('replace_tex_tool'); break;
+      case 'import-mat-folder':
+        call('import_mat_folder', { folder: S.view === 'materials' ? S.folder.materials : null }).then(function (n) { if (n) toast(t('added') + ' (' + n + ')'); });
+        break;
+      case 'import-mat-file':
+        call('import_mat_file').then(function (r) {
+          if (r && r.convert) ensureConverted(r.convert).then(function (ok) { if (ok) call('mat_paint', { path: r.convert }); });
+          if (S.view === 'inmodel') loadModelMats();
+        });
+        break;
     }
   }
 

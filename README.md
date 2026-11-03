@@ -7,7 +7,7 @@
 
 ## نصب
 
-1. فایل `dist/banian_browser_v1.0.0.rbz` را دانلود کنید.
+1. فایل `dist/banian_browser_v1.1.0.rbz` را دانلود کنید.
 2. در اسکچ‌آپ این مسیر را باز کنید: **Extensions → Extension Manager → Install Extension**.
 3. فایل rbz را انتخاب کنید.
 4. از منوی **Extensions → Banian Browser** یا نوار ابزار «Banian Browser» پنجره را باز کنید.
@@ -77,6 +77,43 @@
 - **بخش «در مدل»:** متریال‌های مدل فعلی را نشان می‌دهد، با انتخاب، جایگزینی، ذخیره در کتابخانه، حذف، و پاک کردن متریال‌های بی‌استفاده.
 - **خروجی:** ذخیره همه متریال‌های مدل به صورت skm، یا جمع‌آوری همه تکسچرها در یک پوشه.
 
+## ایمپورت و کاهش پلیگان (مثل Skimp)
+
+| قابلیت | توضیح |
+|---|---|
+| **فرمت‌ها** | GLB، glTF، FBX، OBJ (با MTL)، DAE، 3DS، STL، PLY، VRML، USDZ و SKP |
+| **پیش‌نمایش سه‌بعدی** | مدل با تکسچر و سایه نمایش داده می‌شود: چرخاندن، وایرفریم، روشن و خاموش کردن تکسچر، نمای کامل |
+| **واحد و جهت** | واحد فایل (خودکار، m، cm، mm، in، ft)، محور بالا (Y یا Z)، چرخش ۹۰ درجه، و نمایش ابعاد واقعی به سانتی‌متر |
+| **کاهش پلیگان** | با «درصد سطوح» یا «تلورانس خطا» (حداکثر فاصله به سانتی‌متر). درزهای UV، مرز متریال‌ها و لبه‌های باز حفظ می‌شوند |
+| **سلسله‌مراتب** | ساختار آبجکت‌های فایل به صورت گروه ساخته می‌شود و مش‌های تکراری به صورت کامپوننت |
+| **گزینه‌ها** | سطوح تخت (flat shaded)، تکسچر شطرنجی برای بررسی UV، رنگ متریال روی تکسچر |
+| **مدل‌های خیلی کوچک** | داخل یک کامپوننت با مقیاس ساخته می‌شوند تا سطوح ریز حذف نشوند |
+| **ساده‌سازی داخل مدل** | گروه‌ها و کامپوننت‌های انتخاب‌شده سبک می‌شوند و سلسله‌مراتبشان حفظ می‌شود |
+| **ایمپورت و ساده‌سازی SKP** | فایل skp قبل از قرار گرفتن در مدل سبک می‌شود |
+| **پراکسی دقیق** | به جای جعبه، نسخه کاهش‌یافته واقعی خود مدل به عنوان پراکسی Enscape ساخته می‌شود |
+| **Replace Textures** | متریال فعلی را انتخاب کنید و روی سطحی کلیک کنید: همه سطوح هم‌متریال آن گروه **با حفظ UV** عوض می‌شوند. با `Shift` در کل مدل |
+| **تصویر بندانگشتی** | بعد از اولین پیش‌نمایش، تصویر فایل‌های سه‌بعدی در کتابخانه ساخته می‌شود |
+
+پردازش در موتور جاوااسکریپت پنجره انجام می‌شود (three.js و یک الگوریتم QEM اختصاصی)، پس هیچ فایل باینری کامپایل‌شده‌ای ندارد و به نسخه Ruby اسکچ‌آپ وابسته نیست. در تست، ۲۰۰ هزار مثلث حدود ۳ ثانیه طول کشید.
+
+فایل‌های سه‌بعدی داخل پوشه‌های کتابخانه هم در بخش «مدل‌ها» نشان داده می‌شوند و کلیک روی آن‌ها پنجره ایمپورت را باز می‌کند.
+
+محدودیت‌ها:
+- از USD فقط فایل `usdz` با محتوای متنی (usda) پشتیبانی می‌شود. فایل‌های `usdc`، `usd` و `usda` جداگانه پشتیبانی نمی‌شوند.
+- مدل‌هایی که درزهای UV خیلی زیادی دارند کمتر کاهش پیدا می‌کنند، مگر اینکه گزینه «حفظ درزهای UV» خاموش شود.
+- پیش‌نمایش سه‌بعدی به WebGL در پنجره اسکچ‌آپ نیاز دارد. روی نسخه‌های قدیمی (2017 تا 2019) هنوز تست نشده است.
+
+## ایمپورت متریال
+
+- **فرمت‌ها:** فایل‌های `skm` و تصاویر `jpg` `png` `bmp` `tif` `tga` `gif` `webp` همه به عنوان متریال وارد می‌شوند.
+- **تبدیل خودکار:** `gif` و `webp`، که اسکچ‌آپ نمی‌خواند، یک بار خودکار به PNG تبدیل می‌شوند.
+- **اندازه از نام فایل:** اگر نام فایل اندازه داشته باشد (مثلاً `Oak_120x60cm.jpg` یا `tile 60x60 mm.png`)، اندازه واقعی تکسچر از نام خوانده می‌شود. در غیر این صورت از «عرض پیش‌فرض تکسچر» در تنظیمات استفاده می‌شود.
+- **دکمه‌ها:** «ایمپورت متریال / تصویر» برای یک فایل، و «ایمپورت پوشه تصاویر به عنوان متریال» برای یک پوشه کامل همراه زیرپوشه‌ها.
+
+## فونت
+
+رابط کاربری از فونت **وزیرمتن (Vazirmatn)** استفاده می‌کند. فونت داخل خود پلاگین است، با لایسنس OFL، و به اینترنت نیاز ندارد.
+
 ## پراکسی برای Enscape
 
 مدل‌های سنگین با یک نسخه بسیار سبک جایگزین می‌شوند: یک جعبه شفاف، یا نسخه ساده‌شده‌ای از بزرگ‌ترین سطوح مدل. پراکسی دقیقاً همان مبدأ و ابعاد مدل اصلی را دارد و مسیر فایل کامل را نگه می‌دارد. هندسه کامل از فایل حذف می‌شود، پس فایل skp واقعاً سبک می‌شود.
@@ -120,6 +157,8 @@ src/banian_browser/             کد Ruby، ابزارها، رابط کاربر
 dist/                           فایل rbz آماده نصب
 dev/test_core.rb                تست بخش‌های مستقل از اسکچ‌آپ (ruby dev/test_core.rb)
 dev/preview.js                  اجرای رابط کاربری در مرورگر با داده نمونه و گرفتن اسکرین‌شات
+dev/preview_importer.js         تست پنجره ایمپورت با فایل‌های واقعی (node dev/preview_importer.js model.obj out/)
+dev/test_decimate.js            تست الگوریتم کاهش پلیگان
 dev/build_rbz.py                ساخت فایل rbz
 ```
 
@@ -145,11 +184,19 @@ Banian Browser is an offline library browser for SketchUp 2017–2027, written i
 - Texture positioning: rotate, flip, scale, nudge, fit to face, align to edge, reset, copy/paste mapping.
 - Manage the model's own materials and export materials or textures.
 
+**Import & polygon reduction (Skimp-style)**
+- Formats: GLB, glTF, FBX, OBJ/MTL, DAE, 3DS, STL, PLY, VRML, USDZ and SKP.
+- 3D preview with units and up axis, and reduction by percentage or error tolerance. UV seams, material borders and open edges are kept.
+- Hierarchy is preserved, and repeated meshes become components. Options: flat shaded, checker UV texture.
+- Simplify groups/components already in the model, and build accurate decimated proxies.
+- Replace Textures tool: keeps UVs; click affects one group, Shift+click the whole model.
+- Image files (jpg/png/bmp/tif/tga/gif/webp) import as materials. A size in the file name (e.g. `Oak_120x60cm.jpg`) sets the texture size.
+
 **Proxies for Enscape**
 - Light box or simplified proxies that keep the source model's path. The full geometry is removed from the file.
 - One click swaps everything to full models for rendering and back.
 
 **Interface**
-- Persian/English, light/dark theme.
+- Persian/English, light/dark theme, bundled Vazirmatn font.
 
 Build the package with `python3 dev/build_rbz.py`. Run the core tests with `ruby dev/test_core.rb`.

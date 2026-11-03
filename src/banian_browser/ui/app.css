@@ -1,4 +1,7 @@
 /* Banian Browser - no CSS grid / flex gap so it also runs in SketchUp 2017's browser */
+@font-face { font-family: "Vazirmatn"; src: url("fonts/Vazirmatn-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "Vazirmatn"; src: url("fonts/Vazirmatn-Medium.woff2") format("woff2"); font-weight: 500; font-style: normal; }
+@font-face { font-family: "Vazirmatn"; src: url("fonts/Vazirmatn-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; }
 :root {
   --bg: #f3f5f4;
   --panel: #ffffff;
@@ -40,7 +43,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
-  font-family: "Segoe UI", Tahoma, "Geeza Pro", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Vazirmatn", "Segoe UI", Tahoma, "Geeza Pro", "Helvetica Neue", Arial, sans-serif;
   font-size: 13px; color: var(--text); background: var(--bg);
   -webkit-user-select: none; user-select: none;
 }

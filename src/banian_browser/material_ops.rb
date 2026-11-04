@@ -9,10 +9,14 @@ module BanianStudio
         end
 
         # The material the user picked with the eyedropper (or last imported).
+        # SketchUp's own current material (paint bucket / Materials panel) wins, so the
+        # browser always works on what the user chose in SketchUp.
         def current
+          m = model.materials.current
+          m = nil if m && m.deleted?
+          return m if m
           m = @current
-          m = nil if m && (m.deleted? || !model.materials.include?(m))
-          m || model.materials.current
+          m && !m.deleted? && model.materials.include?(m) ? m : nil
         rescue StandardError
           nil
         end

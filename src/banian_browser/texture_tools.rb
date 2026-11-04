@@ -4,8 +4,8 @@ module BanianStudio
     # Works on textured faces in the selection (and optionally inside selected
     # groups/components). A face that only inherits its texture from a parent group
     # gets the material painted on it first, so it can be positioned.
-    # With nothing textured selected, it works on every face painted with the picked
-    # material, so "rotate the material" just works from the browser.
+    # With nothing selected it works on every face painted with the material chosen in
+    # SketchUp (paint bucket / Materials panel).
     module TextureTools
       class << self
         def model
@@ -66,12 +66,23 @@ module BanianStudio
           m && !m.deleted? && m.texture ? m : nil
         end
 
-        # Selection first; otherwise all faces using the picked material.
+        # Something selected: only the selection. Nothing selected: every face using
+        # the material chosen in SketchUp (paint bucket / Materials panel).
         def resolve_targets
-          list = targets
-          return list unless list.empty?
+          return targets unless model.selection.empty?
           mat = picked_texture
           mat ? faces_with(mat) : []
+        end
+
+        # What the texture buttons will change right now (shown in the browser).
+        def summary
+          if model.selection.empty?
+            m = MaterialOps.current
+            return { 'mode' => 'material', 'mat' => MaterialOps.info(m), 'textured' => !!(m && m.texture) }
+          end
+          list = targets
+          mats = list.map { |f, front, bake| bake || (front ? f.material : f.back_material) }.compact.uniq
+          { 'mode' => 'selection', 'faces' => list.length, 'mats' => mats.length, 'mat' => MaterialOps.info(mats.first) }
         end
 
         def run(name)

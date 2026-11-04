@@ -306,6 +306,10 @@ module BanianStudio
           MaterialOps.info(MaterialOps.current)
         end
 
+        def cmd_tex_target(_a)
+          TextureTools.summary
+        end
+
         def cmd_model_mats(_a)
           MaterialOps.list
         end

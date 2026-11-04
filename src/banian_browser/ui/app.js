@@ -391,7 +391,7 @@
     S.replaceArmed = S.replaceArmed && (v === 'materials' || v === 'inmodel' || v === 'favorites' || v === 'recent');
     renderAll();
     if (v === 'inmodel') loadModelMats();
-    if (v === 'tools') call('picked').then(function (p) { S.picked = p; renderContent(); renderStatus(); });
+    if (v === 'tools') { call('picked').then(function (p) { S.picked = p; renderContent(); renderStatus(); }); loadTarget(); }
   }
 
   function hasTree() { return S.view === 'models' || S.view === 'materials'; }
@@ -430,7 +430,7 @@
     var sel = S.folder[S.view];
     var total = 0;
     roots.forEach(function (r) { total += S.trees[r.path] ? S.trees[r.path].top.cnt[cat] : 0; });
-    var h = '<div class="node' + (sel ? '' : ' on') + '" data-p=""><span class="car"></span>' + icon('layers', 'fi') +
+    var h = '<div class="node all' + (sel ? '' : ' on') + '" data-p=""><span class="car">' + icon('layers', 'fi') + '</span>' +
       '<span class="nm">' + esc(t('all_libraries')) + '</span><span class="ct">' + total + '</span></div>';
     roots.forEach(function (r) {
       var tr = S.trees[r.path];
@@ -450,9 +450,10 @@
       if (S.scanning[node.p]) extra += '<span class="rt">' + esc(t('scanning')) + '</span>';
       else if (node.missing) extra += '<span class="rt" style="color:var(--danger)">' + esc(t('missing')) + '</span>';
     }
-    var h = '<div class="' + cls + '" data-p="' + esc(node.p) + '" style="-webkit-padding-start:' + (depth * 14) + 'px;padding-inline-start:' + (depth * 14) + 'px">' +
-      '<span class="car" data-t="1">' + (kids.length ? icon('caret') : '') + '</span>' +
-      icon(isRoot ? (node.root.type === 'models' ? 'cube' : (node.root.type === 'materials' ? 'swatch' : 'folder')) : 'folder', 'fi') +
+    // roots are quiet section headers; folders are plain text rows with an indent
+    var pad = isRoot ? 2 : 2 + (depth - 1) * 16;
+    var h = '<div class="' + cls + '" data-p="' + esc(node.p) + '" style="-webkit-padding-start:' + pad + 'px;padding-inline-start:' + pad + 'px">' +
+      '<span class="car" data-t="1">' + (kids.length ? icon('caret') : '<i class="dot"></i>') + '</span>' +
       '<span class="nm" title="' + esc(node.p) + '">' + label + '</span>' + extra +
       '<span class="ct">' + node.cnt[cat] + '</span></div>';
     if (open) kids.forEach(function (k) { h += nodeHtml(k, depth + 1, cat, sel); });
@@ -766,6 +767,28 @@
     return 'background:' + (p.color || '#ccc');
   }
 
+  // What the texture buttons will change: the selection, or the SketchUp material.
+  function targetHtml() {
+    var tt = S.texTarget;
+    if (!tt) return '';
+    var m = tt.mat, sw = '<div class="sw" style="' + swatchStyle(m) + '"></div>', txt, warn = false;
+    if (tt.mode === 'selection') {
+      if (!tt.faces) { txt = esc(t('tt_sel_none')); warn = true; }
+      else txt = '<b>' + esc(t('tt_sel').replace('%n', tt.faces)) + '</b>' + (tt.mats > 1 ? ' · ' + esc(t('tt_sel_mats').replace('%n', tt.mats)) : (m ? '<br>' + esc(m.display) : ''));
+    } else if (!m) { txt = esc(t('tt_none')); warn = true; }
+    else if (!tt.textured) { txt = esc(t('tt_no_tex')) + '<br><b>' + esc(m.display) + '</b>'; warn = true; }
+    else txt = esc(t('tt_mat')) + '<br><b>' + esc(m.display) + '</b>';
+    return '<div class="tt' + (warn ? ' warn' : '') + '">' + sw + '<div class="tx">' + txt + '</div></div>';
+  }
+  function loadTarget() {
+    call('tex_target').then(function (tt) { if (tt) { S.texTarget = tt; var el = $('tex-target'); if (el) el.innerHTML = targetHtml(); } });
+  }
+  BB.on('tex_target', function (tt) {
+    S.texTarget = tt;
+    var el = $('tex-target');
+    if (el) el.innerHTML = targetHtml();
+  });
+
   function pickedSub(p) {
     return p.texture ? esc(p.width + ' × ' + p.height + ' cm') + (p.pixels ? ' · ' + p.pixels[0] + '×' + p.pixels[1] + ' px' : '') : esc(t('no_texture'));
   }
@@ -823,6 +846,7 @@
     h += '</div>';
     // texture position
     h += '<div class="panel"><h3>' + icon('rotate') + esc(t('tp_tex')) + '</h3><div class="hint">' + esc(t('tp_tex_hint')) + '</div>' +
+      '<div class="target" id="tex-target">' + targetHtml() + '</div>' +
       '<div class="row"><button class="btn" data-tex="rotate" data-v="90">↺ 90°</button><button class="btn" data-tex="rotate" data-v="-90">↻ 90°</button>' +
       '<button class="btn" data-tex="rotate" data-v="180">180°</button><input class="inp sm" type="number" id="tex-ang" value="45">' +
       '<button class="btn" data-act="tex-rot-custom">' + esc(t('rotate')) + '</button></div>' +
@@ -907,6 +931,7 @@
         renderContent();
         $('content').scrollTop = keep;
       }
+      if (S.texTarget && S.texTarget.mode === 'material') loadTarget();
     }
     if (S.view === 'inmodel') loadModelMats();
   });

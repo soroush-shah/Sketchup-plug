@@ -7,7 +7,7 @@
 
 ## نصب
 
-1. فایل `dist/banian_browser_v1.2.1.rbz` را دانلود کنید.
+1. فایل `dist/banian_browser_v1.2.2.rbz` را دانلود کنید.
 2. در اسکچ‌آپ این مسیر را باز کنید: **Extensions → Extension Manager → Install Extension**.
 3. فایل rbz را انتخاب کنید.
 4. از منوی **Extensions → Banian Browser** یا نوار ابزار «Banian Browser» پنجره را باز کنید.
@@ -65,8 +65,8 @@
   - `Shift` + کلیک: فقط سطح زیر موس (حتی داخل گروه)
   - `Alt`: برداشتن متریال
 - **جایگزینی متریال:** متریال را با قطره‌چکان بردارید، «حالت جایگزینی» را بزنید، بعد روی متریال مقصد کلیک کنید. همه جاهایی که آن متریال استفاده شده عوض می‌شود.
-- **ویرایش متریال برداشته‌شده:** نام، اندازه واقعی تکسچر (سانتی‌متر، با حفظ نسبت)، رنگ و شفافیت. هر تغییر بلافاصله اعمال می‌شود و به دکمه «اعمال» نیازی نیست.
-- **چرخش و اصلاح تکسچر** روی سطوح یا گروه‌های انتخاب‌شده. اگر چیزی انتخاب نشده باشد، روی همه سطوحی که متریال برداشته‌شده را دارند اعمال می‌شود:
+- **ویرایش متریال انتخاب‌شده در اسکچ‌آپ** (هم‌زمان با سطل رنگ اسکچ‌آپ): نام، اندازه واقعی تکسچر (سانتی‌متر، با حفظ نسبت)، رنگ و شفافیت. هر تغییر بلافاصله اعمال می‌شود و به دکمه «اعمال» نیازی نیست.
+- **چرخش و اصلاح تکسچر:** اگر سطح یا گروهی در اسکچ‌آپ انتخاب شده باشد، فقط همان تغییر می‌کند. اگر چیزی انتخاب نشده باشد، همه سطوح متریالی که در سطل رنگ (Materials) اسکچ‌آپ انتخاب شده تغییر می‌کنند. تصویر و نام همان متریال و تعداد سطوحی که تغییر می‌کنند در پنل نشان داده می‌شود:
   - چرخش ۹۰، ۱۸۰ یا زاویه دلخواه
   - قرینه افقی و عمودی
   - بزرگ و کوچک کردن
@@ -170,7 +170,7 @@ Banian Browser is an offline library browser for SketchUp 2017–2027, written i
 **Materials and textures**
 - Paint, eyedropper, Banian bucket, and replace a material everywhere it is used.
 - Edit name, real-world size, color and opacity. Changes apply right away.
-- Texture positioning: rotate, flip, scale, nudge, fit to face, align to edge, reset, copy/paste mapping. It works on the selection, or on every face using the picked material when nothing is selected.
+- Texture positioning: rotate, flip, scale, nudge, fit to face, align to edge, reset, copy/paste mapping. With faces or groups selected only those change; with nothing selected, every face using the material chosen in SketchUp's paint bucket changes. The panel shows that material's thumbnail and how many faces will change.
 - Manage the model's own materials and export materials or textures.
 
 **Import & polygon reduction (Skimp-style)**

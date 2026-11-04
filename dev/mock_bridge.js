@@ -66,6 +66,7 @@
     fav: function (a) { var i = settings.favorites.indexOf(a.path); if (i >= 0) { settings.favorites.splice(i, 1); return false; } settings.favorites.unshift(a.path); return true; },
     picked: function () { return picked; },
     model_mats: function () { return ['Oak Natural', 'Walnut', 'White Paint', 'Glass', 'Concrete'].map(function (n, i) { return { name: n, display: n, color: palette[i], alpha: n === 'Glass' ? 0.3 : 1, texture: i < 2, width: 100, height: 100, thumb: i < 2 ? thumb('a.skm', i) : null, used: i !== 4, current: i === 0 }; }); },
+    tex_target: function () { return { mode: 'material', textured: true, mat: picked }; },
     pin: function (a) { var l = settings.pinned[a.view] = settings.pinned[a.view] || []; var i = l.indexOf(a.path); if (i >= 0) l.splice(i, 1); else l.push(a.path); return settings.pinned; },
     pin_move: function (a) { var l = settings.pinned[a.view] || []; var i = l.indexOf(a.path); var j = Math.max(0, Math.min(l.length - 1, i + a.delta)); l.splice(j, 0, l.splice(i, 1)[0]); return settings.pinned; },
     mat_props: function (a) { window.__props = (window.__props || []).concat([a.props]); Object.keys(a.props).forEach(function (k) { if (k === 'alpha') picked.alpha = a.props.alpha; if (k === 'color') picked.color = a.props.color; }); setTimeout(function () { BB.emit('picked', picked); }, 5); return true; }

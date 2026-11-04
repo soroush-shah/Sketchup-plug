@@ -6,7 +6,7 @@ require 'extensions.rb'
 module BanianStudio
   module BanianBrowser
     PLUGIN_ID = 'banian_browser'.freeze
-    VERSION = '1.2.1'.freeze
+    VERSION = '1.2.2'.freeze
     PLUGIN_ROOT = File.dirname(__FILE__).dup.force_encoding('UTF-8').freeze
     PLUGIN_DIR = File.join(PLUGIN_ROOT, PLUGIN_ID).freeze
 

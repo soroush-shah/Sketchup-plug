@@ -13,6 +13,7 @@ module BanianStudio
         'card_size' => 150,
         'sort' => 'name_asc',
         'recursive' => true,
+        'folder_view' => 'folders', # folders: a folder shows its sub-folders + own files | flat: everything inside
         'place_mode' => 'normal',  # normal | fit3 | fit2 | surface
         'paint_tool' => 'native',  # native | banian | none
         'image_width_cm' => 100.0, # default real width for plain image textures

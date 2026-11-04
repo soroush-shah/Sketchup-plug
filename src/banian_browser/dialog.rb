@@ -414,8 +414,14 @@ module BanianStudio
 
         def cmd_read_b64(a)
           p = Util.norm(a['path'])
-          return nil unless File.file?(p) && File.size(p) < 64 * 1024 * 1024
+          max = a['max'] ? a['max'].to_i : 64 * 1024 * 1024
+          return nil unless File.file?(p) && File.size(p) < max
           [File.binread(p)].pack('m0')
+        end
+
+        # small preview made in the browser from a big image
+        def cmd_save_thumb(a)
+          Thumbnails.save_small(a['path'].to_s, a['data'], a['ext'].to_s)
         end
 
         def cmd_save_converted(a)

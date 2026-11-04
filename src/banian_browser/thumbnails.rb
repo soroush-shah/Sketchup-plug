@@ -49,10 +49,41 @@ module BanianStudio
           Util.file_url(file, stamp)
         end
 
+        # Small copy made by the browser from a big preview image (fast to show).
+        def small_file(path, ext = '.jpg')
+          cache_file(path, ".s#{ext}")
+        end
+
+        def small_existing(path)
+          %w[.jpg .png].map { |e| small_file(path, e) }.find { |f| File.file?(f) }
+        end
+
+        def save_small(path, b64, ext)
+          path = Util.norm(path)
+          return nil unless File.file?(path)
+          ext = ext == '.png' ? '.png' : '.jpg'
+          out = small_file(path, ext)
+          File.open(out + '.tmp', 'wb') { |f| f.write(b64.to_s.unpack('m0')[0]) }
+          File.delete(out) if File.exist?(out)
+          File.rename(out + '.tmp', out)
+          url(out)
+        end
+
+        def drop_small(path)
+          %w[.jpg .png].each do |e|
+            f = small_file(path, e)
+            File.delete(f) if File.file?(f)
+          end
+        rescue StandardError
+          nil
+        end
+
         # Returns a file:// URL or nil (no preview available yet).
         def resolve(path)
           path = Util.norm(path)
           return nil unless File.file?(path)
+          small = small_existing(path)
+          return url(small) if small
           custom = Settings['custom_thumbs'][path]
           return url(custom) if custom && File.file?(custom)
           ext = File.extname(path).downcase
@@ -117,6 +148,7 @@ module BanianStudio
         # Render a precise thumbnail with SketchUp itself (loads the model temporarily).
         def generate_with_sketchup(path)
           path = Util.norm(path)
+          drop_small(path)
           ext = File.extname(path).downcase
           out = cache_file(path)
           none = cache_file(path, '.none')
@@ -150,6 +182,7 @@ module BanianStudio
 
         def set_custom(path, image)
           p = Util.norm(path)
+          drop_small(p)
           dst = File.join(Settings.sub_dir('custom_thumbs'), Digest::MD5.hexdigest(p) + File.extname(image).downcase)
           FileUtils.cp(image, dst)
           h = Settings['custom_thumbs']
@@ -159,6 +192,7 @@ module BanianStudio
         end
 
         def clear_custom(path)
+          drop_small(Util.norm(path))
           Settings['custom_thumbs'].delete(Util.norm(path))
           Settings.save
         end

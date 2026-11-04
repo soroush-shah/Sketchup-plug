@@ -24,6 +24,7 @@
     list: [],
     rendered: 0,
     cardEls: {},
+    mosEls: {},
     replaceArmed: false,
     modelMats: [],
     expanded: {},
@@ -214,11 +215,11 @@
     S.roots.forEach(function (root) {
       var idx = S.indexes[root.path];
       var nodes = {};
-      var top = { p: root.path, n: root.name || basename(root.path), d: null, kids: [], cnt: { model: 0, mat: 0 }, root: root };
+      var top = { p: root.path, n: root.name || basename(root.path), d: null, kids: [], cnt: { model: 0, mat: 0 }, smp: { model: [], mat: [] }, root: root };
       nodes[root.path] = top;
       if (idx) {
         (idx.folders || []).forEach(function (f) {
-          nodes[f.p] = { p: f.p, n: f.n, d: f.d, kids: [], cnt: { model: 0, mat: 0 } };
+          nodes[f.p] = { p: f.p, n: f.n, d: f.d, kids: [], cnt: { model: 0, mat: 0 }, smp: { model: [], mat: [] } };
         });
         (idx.folders || []).forEach(function (f) {
           var parent = nodes[f.d];
@@ -235,6 +236,7 @@
           var guard = 0;
           while (node && guard++ < 64) {
             node.cnt[c]++;
+            if (node.smp[c].length < 4) node.smp[c].push(it.p);
             node = node.d ? nodes[node.d] : null;
           }
         });
@@ -254,18 +256,24 @@
   }
 
   function currentList() {
-    var list;
+    var list, folderMode = false, folder = null;
     var view = S.view;
     if (view === 'models' || view === 'materials') {
       var cat = viewCat();
-      var folder = S.folder[view];
-      var rec = S.settings.recursive !== false;
-      var visibleRoots = {};
-      S.roots.forEach(function (r) { if (rootVisible(r, cat)) visibleRoots[r.path] = true; });
+      folder = S.folder[view];
+      // folder mode: a folder shows its sub-folders as cards plus only its own files;
+      // a search (or the flat mode) lists everything inside instead
+      folderMode = !S.search.trim() && S.settings.folder_view !== 'flat';
+      var visibleRoots = {}, nVisible = 0, onlyRoot = null;
+      S.roots.forEach(function (r) { if (rootVisible(r, cat)) { visibleRoots[r.path] = true; nVisible++; onlyRoot = r.path; } });
+      // a single library: "All libraries" opens straight into its folders
+      if (folderMode && !folder && nVisible === 1) folder = onlyRoot;
       list = S.items.filter(function (it) {
         if (catOf(it) !== cat || !visibleRoots[it.r]) return false;
-        if (folder) {
-          if (rec ? !(it.f === folder || it.f.indexOf(folder + '/') === 0) : it.f !== folder) return false;
+        if (folderMode) {
+          if (!folder || it.f !== folder) return false;
+        } else if (folder) {
+          if (!(it.f === folder || it.f.indexOf(folder + '/') === 0)) return false;
         }
         if (cat === 'mat' && S.matFilter !== 'all') {
           if (S.matFilter === 'skm' && it.k !== 'material') return false;
@@ -290,7 +298,23 @@
       });
     }
     if (view !== 'recent') sortList(list);
+    if (folderMode) list = folderEntries(viewCat(), folder).concat(list);
     return list;
+  }
+
+  // Sub-folders of the open folder (or the libraries themselves at the top level).
+  function folderEntries(cat, folder) {
+    var nodes;
+    if (folder) {
+      var n = findNode(folder);
+      nodes = n ? n.kids : [];
+    } else {
+      nodes = [];
+      S.roots.forEach(function (r) { if (rootVisible(r, cat) && S.trees[r.path]) nodes.push(S.trees[r.path].top); });
+    }
+    return nodes.filter(function (n) { return n.cnt[cat] > 0; }).map(function (n) {
+      return { dir: true, p: n.p, n: n.root ? (n.root.name || n.n) : n.n, node: n };
+    });
   }
 
   function sortList(list) {
@@ -329,6 +353,7 @@
       S.thumbs[p] = map[p] || null;
       var el = S.cardEls[p];
       if (el) setCardThumb(el, S.byPath[p] || stubItem(p));
+      (S.mosEls[p] || []).forEach(function (cell) { setMosaic(cell, map[p]); });
     });
   });
 
@@ -350,20 +375,87 @@
     return '<div class="ph">' + icon(ic) + '<span>' + esc((it.e || '').toUpperCase()) + '</span></div>';
   }
 
+  // The image is shown only once it is completely loaded and decoded, so a card
+  // never shows half a picture; the placeholder stays until then.
   function setCardThumb(card, it) {
     var th = card.querySelector('.th');
     var url = S.thumbs[it.p];
     if (url) {
       var img = th.querySelector('img');
-      if (!img) {
-        th.innerHTML = '';
-        img = document.createElement('img');
-        img.onerror = function () { th.innerHTML = phHtml(it); };
-        th.appendChild(img);
-      }
-      img.src = url;
+      if (img && img.getAttribute('data-src') === url) return;
+      var next = document.createElement('img');
+      next.setAttribute('decoding', 'async');
+      next.setAttribute('data-src', url);
+      next.className = 'ld';
+      next.onload = function () {
+        if (!next.parentNode) return;
+        Array.prototype.forEach.call(th.querySelectorAll('.ph, img'), function (x) { if (x !== next) th.removeChild(x); });
+        next.className = '';
+        maybeShrink(it.p, next, url);
+      };
+      next.onerror = function () { if (next.parentNode) next.parentNode.removeChild(next); if (!th.querySelector('.ph, img')) th.innerHTML = phHtml(it); };
+      if (!th.querySelector('.ph, img')) th.innerHTML = phHtml(it);
+      th.appendChild(next);
+      next.src = url;
     } else if (!th.querySelector('.ph')) {
       th.innerHTML = phHtml(it);
+    }
+  }
+
+  // Big preview images (large textures, big sidecar images) are slow to decode every
+  // time: make a small copy once, in the background, one image at a time.
+  var shrinkQueue = [], shrinking = false, shrinkSeen = {};
+  var SHRINK_MAX = 360;
+  function isSmallUrl(u) { return /\.s\.(jpg|png)(\?|$)/.test(u); }
+  function maybeShrink(p, img, url) {
+    if (shrinkSeen[p] || isSmallUrl(url) || !/^file:/.test(url)) return;
+    if (Math.max(img.naturalWidth, img.naturalHeight) <= SHRINK_MAX * 1.6) return;
+    shrinkSeen[p] = true;
+    shrinkQueue.push({ p: p, img: img, url: url });
+    if (!shrinking) setTimeout(nextShrink, 400);
+  }
+  function fileOfUrl(u) {
+    var s = u.replace(/^file:\/\/\/?/, '').replace(/\?.*$/, '');
+    try { s = decodeURIComponent(s); } catch (e) { /* keep */ }
+    return /^[A-Za-z]:/.test(s) ? s : '/' + s.replace(/^\/+/, '');
+  }
+  function scaled(img) {
+    var w = img.naturalWidth, h = img.naturalHeight, k = SHRINK_MAX / Math.max(w, h);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+    var x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  }
+  function encode(c, png) {
+    return png ? c.toDataURL('image/png').split(',')[1] : c.toDataURL('image/jpeg', 0.86).split(',')[1];
+  }
+  function nextShrink() {
+    var job = shrinkQueue.shift();
+    if (!job) { shrinking = false; return; }
+    shrinking = true;
+    var png = /\.png(\?|$)/i.test(job.url);
+    var done = function () { setTimeout(nextShrink, 150); };
+    var save = function (data) {
+      if (!data) { done(); return; }
+      call('save_thumb', { path: job.p, data: data, ext: png ? '.png' : '.jpg' }).then(function (u) {
+        if (u) S.thumbs[job.p] = u; // used next time; the visible picture stays as it is
+        done();
+      }, done);
+    };
+    try {
+      save(encode(scaled(job.img), png));
+    } catch (e) {
+      // file images can make the canvas "tainted": read the bytes through Ruby instead
+      var src = fileOfUrl(job.url);
+      call('read_b64', { path: src, max: 16 * 1048576 }).then(function (b64) {
+        if (!b64) { done(); return; }
+        var im = new Image();
+        im.onload = function () { try { save(encode(scaled(im), png)); } catch (e2) { done(); } };
+        im.onerror = done;
+        im.src = 'data:image/' + (png ? 'png' : 'jpeg') + ';base64,' + b64;
+      }, done);
     }
   }
 
@@ -477,6 +569,14 @@
     return best;
   }
 
+  function openFolder(p) {
+    S.search = '';
+    var q = $('q');
+    if (q) q.value = '';
+    selectFolder(p);
+    renderPins();
+  }
+
   function selectFolder(p) {
     S.folder[S.view] = p || null;
     if (p) {
@@ -529,7 +629,7 @@
       h += '</select>';
     }
     if (hasTree()) {
-      h += '<button class="btn icon' + (S.settings.recursive !== false ? ' on' : '') + '" data-act="recursive" title="' + esc(t('recursive_tip')) + '">' + icon('sub') + '</button>';
+      h += '<button class="btn icon' + (S.settings.folder_view === 'flat' ? ' on' : '') + '" data-act="folder-view" title="' + esc(t('recursive_tip')) + '">' + icon('sub') + '</button>';
     }
     if (v !== 'inmodel') {
       h += '<button class="btn icon' + (S.settings.show_info ? ' on' : '') + '" data-act="toggle-info" title="' + esc(t('info_tip')) + '">' + icon('info') + '</button>';
@@ -644,6 +744,7 @@
     var v = S.view;
     var box = $('content');
     S.cardEls = {};
+    S.mosEls = {};
     if (observer) observer.disconnect();
     if (v === 'tools') { renderCrumbs(0); box.innerHTML = toolsHtml(); return; }
     if (v === 'settings') { renderCrumbs(0); box.innerHTML = settingsHtml(); return; }
@@ -690,6 +791,7 @@
     var frag = document.createDocumentFragment();
     for (var i = start; i < end; i++) {
       var it = S.list[i];
+      if (it.dir) { frag.appendChild(folderCard(it, i, size)); continue; }
       var card = document.createElement('div');
       card.className = 'card' + (isModelKind(it) ? '' : ' mat');
       card.setAttribute('data-i', i);
@@ -721,6 +823,36 @@
     }
     grid.appendChild(frag);
     S.rendered = end;
+  }
+
+  // Folder card: a 2x2 mosaic of what is inside, the name and the number of items.
+  function folderCard(it, i, size) {
+    var cat = viewCat();
+    var card = document.createElement('div');
+    card.className = 'card folder';
+    card.setAttribute('data-dir', it.p);
+    card.setAttribute('data-i', i);
+    card.style.width = size + 'px';
+    card.title = it.p;
+    var smp = it.node.smp[cat] || [];
+    var cells = '';
+    for (var k = 0; k < 4; k++) cells += '<i' + (smp[k] ? ' data-mp="' + esc(smp[k]) + '"' : '') + '></i>';
+    card.innerHTML = '<div class="th" style="height:' + Math.round(size * 0.78) + 'px"><div class="mos">' + cells + '</div>' +
+      '<span class="fbadge">' + icon('folder') + '</span></div>' +
+      '<div class="cap">' + esc(it.n) + '</div><div class="meta"><span>' + it.node.cnt[cat] + ' ' + esc(t('items')) + '</span></div>';
+    Array.prototype.forEach.call(card.querySelectorAll('[data-mp]'), function (cell) {
+      var p = cell.getAttribute('data-mp');
+      (S.mosEls[p] = S.mosEls[p] || []).push(cell);
+      if (S.thumbs[p]) setMosaic(cell, S.thumbs[p]);
+      else if (S.thumbs[p] === undefined) wantThumb(p);
+    });
+    return card;
+  }
+  function setMosaic(cell, url) {
+    if (!url) { cell.className = 'none'; return; }
+    var img = new Image();
+    img.onload = function () { cell.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")'; cell.className = 'ok'; };
+    img.src = url;
   }
 
   function metaHtml(it) {
@@ -1311,8 +1443,7 @@
       if (!b) return;
       var p = b.getAttribute('data-pin');
       if (!findNode(p)) { toast(t('missing'), true); return; }
-      selectFolder(S.folder[S.view] === p ? null : p);
-      renderPins();
+      openFolder(p);
     });
     $('pins').addEventListener('contextmenu', function (e) {
       var b = e.target.closest('[data-pin]');
@@ -1371,6 +1502,7 @@
         }
         return;
       }
+      if (card && card.hasAttribute('data-dir')) { openFolder(card.getAttribute('data-dir')); return; }
       if (card && card.hasAttribute('data-i')) activate(itemByCard(card));
       onToolsClick(e);
       onSettingsClick(e);
@@ -1379,12 +1511,34 @@
       var card = e.target.closest('.card');
       if (!card) return;
       if (card.hasAttribute('data-mm')) { modelMatMenu(e, S.mmList[+card.getAttribute('data-mm')]); return; }
+      if (card.hasAttribute('data-dir')) { folderMenu(e, card.getAttribute('data-dir')); return; }
       var it = itemByCard(card);
       if (it) itemMenu(e, it);
     });
     content.addEventListener('dragstart', function (e) {
       var card = e.target.closest('.card[data-p]');
       if (card) e.dataTransfer.setData('text/plain', card.getAttribute('data-p'));
+    });
+    // drop a card on a folder card to move it there
+    content.addEventListener('dragover', function (e) {
+      var f = e.target.closest('.card.folder');
+      if (!f) return;
+      e.preventDefault();
+      f.classList.add('drop');
+    });
+    content.addEventListener('dragleave', function (e) {
+      var f = e.target.closest('.card.folder');
+      if (f) f.classList.remove('drop');
+    });
+    content.addEventListener('drop', function (e) {
+      var f = e.target.closest('.card.folder');
+      if (!f) return;
+      e.preventDefault();
+      f.classList.remove('drop');
+      var dest = f.getAttribute('data-dir'), src = e.dataTransfer.getData('text/plain');
+      if (dest && src && dirname(src) !== dest) {
+        call('move', { paths: [src], dest: dest }).then(function (r) { if (r && r.moved && r.moved.length) toast(t('moved')); });
+      }
     });
     content.addEventListener('change', onFormChange);
     content.addEventListener('input', function (e) {
@@ -1415,8 +1569,8 @@
         S.search = '';
         renderTopbar(); renderContent();
         break;
-      case 'recursive':
-        saveSettings({ recursive: S.settings.recursive === false });
+      case 'folder-view':
+        saveSettings({ folder_view: S.settings.folder_view === 'flat' ? 'folders' : 'flat' });
         renderTopbar(); renderContent();
         break;
       case 'mkdir': if (S.folder[S.view]) mkdirIn(S.folder[S.view]); break;

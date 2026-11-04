@@ -1,9 +1,11 @@
 module BanianStudio
   module BanianBrowser
-    # Texture positioning on selected faces: rotate, flip, scale, nudge, fit, align.
-    # Works on faces in the selection and (optionally) faces inside selected
-    # groups/components. A face that only inherits its texture from a parent
-    # group gets the material painted on it first, so it can be positioned.
+    # Texture positioning: rotate, flip, scale, nudge, fit, align.
+    # Works on textured faces in the selection (and optionally inside selected
+    # groups/components). A face that only inherits its texture from a parent group
+    # gets the material painted on it first, so it can be positioned.
+    # With nothing textured selected, it works on every face painted with the picked
+    # material, so "rotate the material" just works from the browser.
     module TextureTools
       class << self
         def model
@@ -41,19 +43,50 @@ module BanianStudio
           result
         end
 
-        def run(name)
+        # Every face (model + all definitions) painted with mat on either side.
+        def faces_with(mat)
+          out = []
+          scan = lambda do |ents|
+            ents.each do |e|
+              next unless e.is_a?(Sketchup::Face)
+              if e.material == mat
+                out << [e, true]
+              elsif e.back_material == mat
+                out << [e, false]
+              end
+            end
+          end
+          scan.call(model.entities)
+          model.definitions.each { |d| scan.call(d.entities) unless d.image? }
+          out
+        end
+
+        def picked_texture
+          m = MaterialOps.current
+          m && !m.deleted? && m.texture ? m : nil
+        end
+
+        # Selection first; otherwise all faces using the picked material.
+        def resolve_targets
           list = targets
+          return list unless list.empty?
+          mat = picked_texture
+          mat ? faces_with(mat) : []
+        end
+
+        def run(name)
+          list = resolve_targets
           if list.empty?
             UI.messagebox(I18n.t(:select_textured))
             return 0
           end
+          @single = list.length == 1
           model.start_operation(I18n.t(:op_texture), true)
           n = 0
-          tw = Sketchup.create_texture_writer
           list.each do |face, front, bake|
             begin
               face.material = bake if bake
-              n += 1 if yield(face, front, tw)
+              n += 1 if yield(face, front)
             rescue StandardError => e
               Util.log_error(e, name)
             end
@@ -63,8 +96,8 @@ module BanianStudio
         end
 
         # Three non-collinear points on the face plane and their UVs.
-        def sample(face, front, tw)
-          uvh = face.get_UVHelper(front, !front, tw)
+        def sample(face, front, _tw = nil)
+          uvh = face.get_UVHelper(true, true)
           p0 = face.bounds.center.project_to_plane(face.plane)
           axes = face.normal.axes
           pts = [p0, p0.offset(axes[0], 10), p0.offset(axes[1], 10)]
@@ -87,11 +120,12 @@ module BanianStudio
           true
         end
 
-        # Generic UV transform around the UV of the face centre.
+        # Generic UV transform. One face turns around its own centre; several faces
+        # turn around the texture origin so neighbouring faces stay seamless.
         def transform_uv(name)
-          run(name) do |face, front, tw|
-            pts, uvs = sample(face, front, tw)
-            c = uvs[0]
+          run(name) do |face, front|
+            pts, uvs = sample(face, front)
+            c = @single ? uvs[0] : [0.0, 0.0]
             new_uvs = uvs.map { |u| yield(u[0] - c[0], u[1] - c[1], c) }
             apply(face, front, pts, new_uvs)
           end
@@ -138,7 +172,7 @@ module BanianStudio
 
         # Stretch one texture tile exactly over the face.
         def fit
-          run('fit') do |face, front, _tw|
+          run('fit') do |face, front|
             o, xa, ya, x0, x1, y0, y1 = face_frame(face)
             next false if (x1 - x0) < 1e-6 || (y1 - y0) < 1e-6
             p0 = o.offset(xa, x0).offset(ya, y0)
@@ -150,7 +184,7 @@ module BanianStudio
 
         # Real-world size, aligned to the longest edge, starting at its corner.
         def align
-          run('align') do |face, front, _tw|
+          run('align') do |face, front|
             mat = front ? face.material : face.back_material
             tex = mat.texture
             o, xa, ya, x0, _x1, y0, _y1 = face_frame(face)
@@ -161,7 +195,7 @@ module BanianStudio
 
         # Reset to SketchUp's default mapping by repainting.
         def reset
-          run('reset') do |face, front, _tw|
+          run('reset') do |face, front|
             if front
               m = face.material
               face.material = nil
@@ -180,8 +214,7 @@ module BanianStudio
           list = targets
           return UI.messagebox(I18n.t(:select_textured)) && false if list.empty?
           face, front = list.first
-          tw = Sketchup.create_texture_writer
-          pts, uvs = sample(face, front, tw)
+          pts, uvs = sample(face, front)
           @clip = { 'mat' => (front ? face.material : face.back_material), 'pts' => pts, 'uvs' => uvs }
           true
         end
@@ -189,7 +222,7 @@ module BanianStudio
         def paste_mapping
           return false unless @clip && !@clip['mat'].deleted?
           clip = @clip
-          run('paste') do |face, front, _tw|
+          run('paste') do |face, front|
             if front
               face.material = clip['mat']
             else

@@ -7,7 +7,8 @@
   var settings = {
     roots: roots, favorites: [], recent: [], usage: {}, custom_thumbs: {}, language: 'fa', theme: 'light',
     card_size: 150, sort: 'name_asc', recursive: true, place_mode: 'normal', paint_tool: 'native',
-    image_width_cm: 100, proxy_mode: 'box', proxy_faces: 300, proxy_remove_full: true, rotate_step: 45,
+    image_width_cm: 100, rotate_step: 45, place_rotate: 90, show_info: false,
+    pinned: { models: ['D:/Library/Objects/Furniture/Chairs', 'D:/Library/Objects/Plants'], materials: ['D:/Library/Materials/Stone/Marble'] },
     tex_include_groups: true, tex_nudge: 0.1, show_ext: false
   };
   function idx(root, tree) {
@@ -65,7 +66,9 @@
     fav: function (a) { var i = settings.favorites.indexOf(a.path); if (i >= 0) { settings.favorites.splice(i, 1); return false; } settings.favorites.unshift(a.path); return true; },
     picked: function () { return picked; },
     model_mats: function () { return ['Oak Natural', 'Walnut', 'White Paint', 'Glass', 'Concrete'].map(function (n, i) { return { name: n, display: n, color: palette[i], alpha: n === 'Glass' ? 0.3 : 1, texture: i < 2, width: 100, height: 100, thumb: i < 2 ? thumb('a.skm', i) : null, used: i !== 4, current: i === 0 }; }); },
-    proxy: function () { return { proxies: 12, types: 3, full: 0, missing: 0, dir: 'C:/Users/me/AppData/Local/BanianBrowser/proxies', mode: 'box' }; }
+    pin: function (a) { var l = settings.pinned[a.view] = settings.pinned[a.view] || []; var i = l.indexOf(a.path); if (i >= 0) l.splice(i, 1); else l.push(a.path); return settings.pinned; },
+    pin_move: function (a) { var l = settings.pinned[a.view] || []; var i = l.indexOf(a.path); var j = Math.max(0, Math.min(l.length - 1, i + a.delta)); l.splice(j, 0, l.splice(i, 1)[0]); return settings.pinned; },
+    mat_props: function (a) { window.__props = (window.__props || []).concat([a.props]); Object.keys(a.props).forEach(function (k) { if (k === 'alpha') picked.alpha = a.props.alpha; if (k === 'color') picked.color = a.props.color; }); setTimeout(function () { BB.emit('picked', picked); }, 5); return true; }
   };
   window.sketchup = {
     bb_call: function (json) {

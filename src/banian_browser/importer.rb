@@ -6,7 +6,6 @@ module BanianStudio
     #    3D preview: units, up axis, polygon reduction (percent or error tolerance),
     #    flat shading, placeholder UV texture, components for repeated meshes.
     #  * Simplify groups / components already in the model (hierarchy preserved).
-    #  * Build accurate decimated proxies for Enscape.
     #
     # Parsing, preview and reduction run in the dialog's JavaScript engine (three.js +
     # decimate.js); Ruby streams files to it and builds the final SketchUp geometry with
@@ -14,6 +13,7 @@ module BanianStudio
     module Importer
       MESH_EXTS = %w[.glb .gltf .fbx .obj .dae .3ds .stl .ply .wrl .vrml .usdz].freeze
       CHUNK = 768 * 1024
+      FACES_PER_SLICE = 4000 # model data is sent in slices so SketchUp never freezes
       SMOOTH = 12 # AUTO_SOFTEN | SMOOTH_SOFT_EDGES
 
       class << self
@@ -48,8 +48,8 @@ module BanianStudio
           open_file(f) if f
         end
 
-        # purpose: 'simplify' (replace geometry) or 'proxy' (build decimated proxies)
-        def open_selection(purpose)
+        # purpose: 'simplify' (replace the geometry of the selected groups/components)
+        def open_selection(purpose = 'simplify')
           insts = Util.instances_in(model.selection.to_a)
           if insts.empty?
             UI.messagebox(I18n.t(:select_components))
@@ -78,6 +78,7 @@ module BanianStudio
         end
 
         def close
+          stop_slices
           return unless @dlg
           d = @dlg
           @dlg = nil
@@ -91,7 +92,7 @@ module BanianStudio
           @reads = {}
           @geoms = {}
           return unless ctx && ctx['mode'] == 'skp' && !ctx['done']
-          Proxy.remove_definition(ctx['definition']) if ctx['definition'] && ctx['definition'].valid?
+          Util.remove_definition(ctx['definition']) if ctx['definition'] && ctx['definition'].valid?
         end
 
         def js(code)
@@ -119,7 +120,7 @@ module BanianStudio
             'mode' => ctx['mode'],
             'lang' => Settings['language'],
             'theme' => Settings['theme'],
-            'settings' => Settings.data.select { |k, _| k =~ /\A(import|simplify|proxy)_/ },
+            'settings' => Settings.data.select { |k, _| k =~ /\A(import|simplify)_/ },
             'su' => Util.su_major
           }
           if ctx['path']
@@ -190,32 +191,58 @@ module BanianStudio
           true
         end
 
-        # ---- model data for simplify / skp / proxy -----------------------------------------
+        # ---- model data for simplify / skp ---------------------------------------------------
+        # Replies with the node tree at once; the geometry follows as 'mgeom' events in
+        # small timer slices (then 'mgeom_done' with the materials), so big models never
+        # block SketchUp and the dialog can show progress.
         def cmd_model_data(_a)
           ctx = @ctx
           @mats = []
           @mat_index = {}
           @keys = {}
-          @payload_geoms = {}
+          @todo = []
           nodes = []
           case ctx['mode']
           when 'skp'
             d = ctx['definition']
-            nodes << node_for(d, Geom::Transformation.new, d.name, 0, false)
+            nodes << node_for(d, Geom::Transformation.new, d.name, 0)
           when 'simplify'
             ctx['instances'].each do |i|
               next unless i.valid?
-              nodes << node_for(Util.definition_of(i), i.transformation, i.name.to_s, 0, false)
-            end
-          when 'proxy'
-            ctx['instances'].each do |i|
-              next unless i.valid?
-              d = Util.definition_of(i)
-              key = flat_key(d)
-              nodes << { 'n' => d.name, 'm' => i.transformation.to_a, 'g' => key, 'c' => [] }
+              nodes << node_for(Util.definition_of(i), i.transformation, i.name.to_s, 0)
             end
           end
-          { 'materials' => @mats, 'nodes' => nodes, 'geoms' => @payload_geoms }
+          total = @todo.inject(0) { |s, t| s + t[1].length }
+          start_slices
+          { 'nodes' => nodes, 'faces' => total }
+        end
+
+        def start_slices
+          stop_slices
+          @slice_timer = UI.start_timer(0.01, true) { run_slice }
+        end
+
+        def stop_slices
+          UI.stop_timer(@slice_timer) if @slice_timer
+          @slice_timer = nil
+        end
+
+        def run_slice
+          budget = FACES_PER_SLICE
+          while budget > 0 && (job = @todo.first)
+            key, faces = job
+            take = faces.shift(budget)
+            budget -= take.length
+            @todo.shift if faces.empty?
+            emit('mgeom', 'key' => key, 'faces' => take.length, 'parts' => faces_to_parts(take.map { |f| [f, nil, nil] }))
+          end
+          return unless @todo.empty?
+          stop_slices
+          emit('mgeom_done', 'materials' => @mats)
+        rescue StandardError => e
+          stop_slices
+          Util.log_error(e, 'model data')
+          emit('mgeom_done', 'materials' => @mats || [], 'error' => e.message)
         end
 
         def mat_id(mat)
@@ -240,13 +267,13 @@ module BanianStudio
           %w[.jpg .jpeg .png .bmp].include?(e) ? e : '.png'
         end
 
-        def node_for(d, tr, name, depth, _flat)
+        def node_for(d, tr, name, depth)
           key = geom_key(d)
           children = []
           if depth < 30
             d.entities.each do |e|
               next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
-              children << node_for(Util.definition_of(e), e.transformation, e.name.to_s, depth + 1, false)
+              children << node_for(Util.definition_of(e), e.transformation, e.name.to_s, depth + 1)
             end
           end
           { 'n' => Util.utf8(name.to_s.empty? ? d.name : name), 'm' => tr.to_a, 'g' => key, 'c' => children }
@@ -259,39 +286,17 @@ module BanianStudio
           key = nil
           unless faces.empty?
             key = "d#{@keys.length}"
-            @payload_geoms[key] = faces_to_parts(faces.map { |f| [f, nil, nil] })
+            @todo << [key, faces]
             @geoms[key] = d
           end
           @keys[d] = key
-        end
-
-        # Whole definition flattened into one mesh in its own coordinates (for proxies).
-        def flat_key(d)
-          return @keys[d] if @keys.key?(d)
-          list = []
-          collect_flat(d.entities, Geom::Transformation.new, nil, list, 0)
-          key = "p#{@keys.length}"
-          @payload_geoms[key] = faces_to_parts(list)
-          @geoms[key] = d
-          @keys[d] = key
-        end
-
-        def collect_flat(ents, tr, inherited, list, depth)
-          return if depth > 30
-          ents.each do |e|
-            if e.is_a?(Sketchup::Face)
-              list << [e, tr, inherited]
-            elsif e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
-              next if e.hidden?
-              collect_flat(Util.definition_of(e).entities, tr * e.transformation, e.material || inherited, list, depth + 1)
-            end
-          end
         end
 
         # => [{ 'mat' => id, 'pts' => [...], 'uvs' => [...]|nil, 'tris' => [...] }]
         def faces_to_parts(list)
           parts = {}
           list.each do |face, tr, inherited|
+            next unless face.valid?
             mat = face.material || inherited
             textured = mat && mat.texture
             mesh = face.mesh(textured ? 1 : 0)
@@ -334,11 +339,10 @@ module BanianStudio
           res = case ctx['mode']
                 when 'file' then build_import(@import_meta, @incoming, opts)
                 when 'skp', 'simplify' then apply_simplify(@incoming, opts)
-                when 'proxy' then build_proxies(@incoming, opts)
                 end
           ctx['done'] = true
           if ctx['mode'] == 'skp' && ctx['definition'].valid?
-            model.place_component(ctx['definition'], false)
+            model.select_tool(PlaceTool.new(ctx['definition']))
           end
           @incoming = {}
           res
@@ -441,7 +445,7 @@ module BanianStudio
           end
           Settings.record_use(path)
           ModelOps.last_definition = root
-          model.place_component(root, false) if root.entities.length > 0
+          model.select_tool(PlaceTool.new(root)) if root.entities.length > 0
           { 'faces' => faces }
         end
 
@@ -534,34 +538,6 @@ module BanianStudio
             raise e
           end
           { 'before' => before, 'after' => after }
-        end
-
-        # ---- decimated proxies ---------------------------------------------------------------------
-        def build_proxies(geoms, opts)
-          mats = model_materials
-          flags = smooth_flags(opts)
-          model.start_operation(I18n.t(:op_proxy), true)
-          done = 0
-          begin
-            geoms.each do |key, parts|
-              full = @geoms[key]
-              next unless full && full.valid? && !Proxy.proxy?(full)
-              src = Proxy.ensure_source(full)
-              pdef = model.definitions.add("#{full.name} [Proxy]")
-              add_parts(pdef.entities, parts, mats, flags)
-              Proxy.tag(pdef, src, 'decimated', full.name)
-              full.instances.to_a.each { |i| i.definition = pdef }
-              full.set_attribute(Proxy::PDICT, 'role', 'full')
-              Proxy.remove_definition(full) if Settings['proxy_remove_full']
-              done += 1
-            end
-            model.commit_operation
-          rescue StandardError => e
-            model.abort_operation
-            raise e
-          end
-          Dialog.emit('proxy_stats', Proxy.stats)
-          { 'proxies' => done }
         end
       end
     end

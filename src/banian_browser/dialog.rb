@@ -425,25 +425,26 @@ module BanianStudio
           end
         end
 
-        # ---- proxies -----------------------------------------------------------------------
-        def cmd_proxy(a)
-          case a['op']
-          when 'make' then Proxy.convert_selection(a['mode'])
-          when 'all_full' then Proxy.to_full('all')
-          when 'all_proxy' then Proxy.to_proxy('all')
-          when 'sel_full' then Proxy.to_full('selection')
-          when 'sel_proxy' then Proxy.to_proxy('selection')
-          when 'open' then Proxy.open_source
-          when 'regular' then Proxy.make_regular
-          when 'place' then Proxy.place_as_proxy(a['path'])
-          when 'decimated' then Importer.open_selection('proxy')
-          when 'choose_dir'
-            d = choose_folder(:choose_folder)
-            Settings['proxy_dir'] = d if d
-            Proxy.stats
-          when 'stats' then Proxy.stats
-          else raise ArgumentError, 'unknown proxy op'
-          end
+        # Arrow keys pressed in this window while a model is being placed.
+        def cmd_place_turn(a)
+          tool = PlaceTool.current
+          return false unless tool
+          tool.turn(a['dir'].to_i)
+          true
+        end
+
+        def cmd_place_cancel(_a)
+          model.select_tool(nil) if PlaceTool.current
+          true
+        end
+
+        # ---- pinned folders ------------------------------------------------------------------
+        def cmd_pin(a)
+          Settings.toggle_pin(a['view'].to_s, a['path'].to_s)
+        end
+
+        def cmd_pin_move(a)
+          Settings.move_pin(a['view'].to_s, a['path'].to_s, a['delta'].to_i)
         end
 
         def cmd_tool(a)
@@ -453,6 +454,7 @@ module BanianStudio
           when 'fit3' then d && model.select_tool(FitPlaceTool.new(d, 'three'))
           when 'fit2' then d && model.select_tool(FitPlaceTool.new(d, 'two'))
           when 'surface' then d && model.select_tool(SurfacePlaceTool.new(d))
+          when 'place' then d && model.select_tool(PlaceTool.new(d))
           end
           d ? true : false
         end

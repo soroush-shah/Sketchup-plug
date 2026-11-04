@@ -1,13 +1,13 @@
 # Banian Browser (بانیان بروزر)
 
-کتابخانه آفلاین مدل، متریال و تکسچر برای اسکچ‌آپ، به همراه ابزارهای قرار دادن مدل، متریال، تکسچر و پراکسی برای Enscape.
+کتابخانه آفلاین مدل، متریال و تکسچر برای اسکچ‌آپ، به همراه ابزارهای قرار دادن مدل، متریال، تکسچر، و ایمپورت با کاهش پلیگان.
 کد Ruby آن کاملاً خوانا و بدون رمزگذاری است و روی **SketchUp 2017 تا 2027** (ویندوز و مک) کار می‌کند.
 
 > پلاگین 3D Stocker (`SKMaterialBrower_v1.6.4.rbz`) با RubyEncoder رمزگذاری شده و فقط لودر Ruby 2.2 تا 3.2 را دارد. SketchUp 2027 از Ruby 3.4 استفاده می‌کند، برای همین آن پلاگین نصب نمی‌شود. بانیان بروزر جایگزین آفلاین آن است.
 
 ## نصب
 
-1. فایل `dist/banian_browser_v1.1.0.rbz` را دانلود کنید.
+1. فایل `dist/banian_browser_v1.2.0.rbz` را دانلود کنید.
 2. در اسکچ‌آپ این مسیر را باز کنید: **Extensions → Extension Manager → Install Extension**.
 3. فایل rbz را انتخاب کنید.
 4. از منوی **Extensions → Banian Browser** یا نوار ابزار «Banian Browser» پنجره را باز کنید.
@@ -27,6 +27,8 @@
   4. اگر هیچ‌کدام نبود، از منوی راست‌کلیک «ساخت تصویر با اسکچ‌آپ»
 - **امکانات مرور:** جستجو در نام فایل و نام پوشه، مرتب‌سازی (نام، تاریخ، حجم، پرکاربرد)، اندازه کارت قابل تغییر، محبوب‌ها، فهرست اخیر.
 - **مدیریت فایل:** تغییر نام، حذف، ساخت پوشه، و جابه‌جایی با کشیدن کارت روی پوشه.
+- **پوشه‌های سنجاق‌شده:** پوشه‌هایی را که زیاد استفاده می‌کنید، هم در «مدل‌ها» و هم در «متریال‌ها»، بالای صفحه سنجاق کنید. این کار با راست‌کلیک روی پوشه («سنجاق کردن بالای صفحه») یا دکمه سنجاق کنار مسیر پوشه انجام می‌شود. ترتیب آن‌ها را با راست‌کلیک روی هر سنجاق عوض کنید.
+- **اطلاعات فایل:** با دکمه ⓘ در نوار بالا (یا از تنظیمات) نام کامل فایل همراه پسوند، حجم و تاریخ زیر هر مدل و متریال نوشته می‌شود.
 - مدل‌هایی که با نسخه جدیدتر اسکچ‌آپ ذخیره شده‌اند، نشان قرمز سال نسخه را می‌گیرند تا پیش از باز کردن مشخص باشند.
 
 ## مدل‌ها
@@ -35,11 +37,10 @@
 
 | حالت | کار |
 |---|---|
-| عادی | مثل کامپوننت معمولی همراه موس قرار می‌گیرد |
+| عادی | مدل همراه موس می‌آید. قبل از کلیک، با `↑` / `↓` به اندازه زاویه تنظیمات (پیش‌فرض ۹۰ درجه) می‌چرخد. می‌توانید زاویه را تایپ کنید و `Enter` بزنید. با `Ctrl` چند نسخه پشت سر هم می‌گذارید |
 | ۳ نقطه | مدل داخل ناحیه‌ای که با سه نقطه می‌کشید کش می‌آید (عرض، ارتفاع، و عمق قابل تایپ) |
 | قطری | مدل داخل یک مستطیل قطری روی کف یا دیوار کش می‌آید |
 | روی سطح | مدل به دیوار، سقف یا شیب می‌چسبد. با `←` `→` می‌چرخد و با `Ctrl` بین «هم‌راستا با سطح» و «ایستاده» عوض می‌شود |
-| پراکسی | مدل مستقیم به صورت پراکسی سبک قرار می‌گیرد |
 
 کلیدهای ابزار کش آمدن:
 - `Tab` تغییر حالت
@@ -64,8 +65,8 @@
   - `Shift` + کلیک: فقط سطح زیر موس (حتی داخل گروه)
   - `Alt`: برداشتن متریال
 - **جایگزینی متریال:** متریال را با قطره‌چکان بردارید، «حالت جایگزینی» را بزنید، بعد روی متریال مقصد کلیک کنید. همه جاهایی که آن متریال استفاده شده عوض می‌شود.
-- **ویرایش متریال برداشته‌شده:** نام، اندازه واقعی تکسچر (سانتی‌متر، با حفظ نسبت)، رنگ و شفافیت.
-- **چرخش و اصلاح تکسچر** روی سطوح یا گروه‌های انتخاب‌شده:
+- **ویرایش متریال برداشته‌شده:** نام، اندازه واقعی تکسچر (سانتی‌متر، با حفظ نسبت)، رنگ و شفافیت. هر تغییر بلافاصله اعمال می‌شود و به دکمه «اعمال» نیازی نیست.
+- **چرخش و اصلاح تکسچر** روی سطوح یا گروه‌های انتخاب‌شده. اگر چیزی انتخاب نشده باشد، روی همه سطوحی که متریال برداشته‌شده را دارند اعمال می‌شود:
   - چرخش ۹۰، ۱۸۰ یا زاویه دلخواه
   - قرینه افقی و عمودی
   - بزرگ و کوچک کردن
@@ -90,11 +91,15 @@
 | **مدل‌های خیلی کوچک** | داخل یک کامپوننت با مقیاس ساخته می‌شوند تا سطوح ریز حذف نشوند |
 | **ساده‌سازی داخل مدل** | گروه‌ها و کامپوننت‌های انتخاب‌شده سبک می‌شوند و سلسله‌مراتبشان حفظ می‌شود |
 | **ایمپورت و ساده‌سازی SKP** | فایل skp قبل از قرار گرفتن در مدل سبک می‌شود |
-| **پراکسی دقیق** | به جای جعبه، نسخه کاهش‌یافته واقعی خود مدل به عنوان پراکسی Enscape ساخته می‌شود |
 | **Replace Textures** | متریال فعلی را انتخاب کنید و روی سطحی کلیک کنید: همه سطوح هم‌متریال آن گروه **با حفظ UV** عوض می‌شوند. با `Shift` در کل مدل |
 | **تصویر بندانگشتی** | بعد از اولین پیش‌نمایش، تصویر فایل‌های سه‌بعدی در کتابخانه ساخته می‌شود |
 
-پردازش در موتور جاوااسکریپت پنجره انجام می‌شود (three.js و یک الگوریتم QEM اختصاصی)، پس هیچ فایل باینری کامپایل‌شده‌ای ندارد و به نسخه Ruby اسکچ‌آپ وابسته نیست. در تست، ۲۰۰ هزار مثلث حدود ۳ ثانیه طول کشید.
+پردازش در موتور جاوااسکریپت پنجره انجام می‌شود (three.js و یک الگوریتم QEM اختصاصی)، پس هیچ فایل باینری کامپایل‌شده‌ای ندارد و به نسخه Ruby اسکچ‌آپ وابسته نیست. در تست، ۲۰۰ هزار مثلث حدود ۱ ثانیه طول کشید.
+
+برای اینکه پنجره کند نشود و هنگ نکند:
+- پیش‌نمایش فقط وقتی چیزی تغییر کند دوباره رسم می‌شود.
+- هندسه مدل تکه‌تکه از اسکچ‌آپ خوانده می‌شود.
+- اگر وسط کاهش پلیگان اسلایدر را تغییر دهید، کار قبلی لغو می‌شود و با مقدار جدید شروع می‌شود.
 
 فایل‌های سه‌بعدی داخل پوشه‌های کتابخانه هم در بخش «مدل‌ها» نشان داده می‌شوند و کلیک روی آن‌ها پنجره ایمپورت را باز می‌کند.
 
@@ -114,33 +119,13 @@
 
 رابط کاربری از فونت **وزیرمتن (Vazirmatn)** استفاده می‌کند. فونت داخل خود پلاگین است، با لایسنس OFL، و به اینترنت نیاز ندارد.
 
-## پراکسی برای Enscape
-
-مدل‌های سنگین با یک نسخه بسیار سبک جایگزین می‌شوند: یک جعبه شفاف، یا نسخه ساده‌شده‌ای از بزرگ‌ترین سطوح مدل. پراکسی دقیقاً همان مبدأ و ابعاد مدل اصلی را دارد و مسیر فایل کامل را نگه می‌دارد. هندسه کامل از فایل حذف می‌شود، پس فایل skp واقعاً سبک می‌شود.
-
-روند کار:
-1. با پراکسی طراحی کنید.
-2. قبل از رندر در Enscape، «نمایش مدل‌های کامل برای رندر» را بزنید.
-3. رندر بگیرید.
-4. «برگشت به پراکسی» را بزنید.
-
-امکانات دیگر:
-- تبدیل انتخاب به پراکسی
-- تبدیل انتخاب‌شده‌ها بین پراکسی و مدل کامل
-- باز کردن مدل اصلی
-- تبدیل به کامپوننت معمولی
-- آمار پراکسی‌ها و فایل‌های گم‌شده
-
-مدل‌های کتابخانه را می‌شود مستقیم به صورت پراکسی گذاشت. مدل سنگین فقط یک بار خوانده می‌شود و پراکسی آن کش می‌شود.
-
-> این پراکسی‌ها مال خود بانیان بروزر است و به قابلیت پراکسی داخلی Enscape وصل نیست، چون Enscape API عمومی برای این کار ندارد. برای همین قبل از رندر باید مدل‌های کامل را برگرداند. این کار یک کلیک است.
-
 ## زبان و ظاهر
 
 - فارسی (راست‌به‌چپ) و انگلیسی
 - پوسته روشن و تیره
 - همه گزینه‌ها با راست‌کلیک روی کارت‌ها و پوشه‌ها در دسترس است.
 - `Ctrl+F` برای جستجو
+- منوها و نوار ابزار داخل خود اسکچ‌آپ (Extensions، راست‌کلیک) انگلیسی هستند تا درست نمایش داده شوند. پنجره بانیان بروزر همچنان فارسی یا انگلیسی است.
 
 ## محل ذخیره تنظیمات
 
@@ -172,31 +157,31 @@ Banian Browser is an offline library browser for SketchUp 2017–2027, written i
 - Add your model and material folders. Every sub-folder is scanned automatically and becomes a category.
 - Thumbnails come from a custom image, a same-name image next to the file, the preview embedded in the skp/skm, or a SketchUp-rendered thumbnail.
 - Search, sort, favorites, recent, and file management (rename, delete, new folder, drag to move).
+- Pin frequently used folders above the grid, separately for Models and Materials.
+- Optional file info under each card: full name with extension, size and date.
 
 **Models**
-- Placement modes: normal, 3-point fit, diagonal fit, place on surface, place as proxy.
+- Placement modes: normal, 3-point fit, diagonal fit, place on surface.
+- While a model follows the cursor, Up/Down rotates it by a step set in Settings (90° by default). You can also type an angle, and Ctrl places several copies.
 - Replace selected components, array along a path, sweep a profile along a path.
 - Open a file in the current or a new window, and save the selection to the library.
 
 **Materials and textures**
 - Paint, eyedropper, Banian bucket, and replace a material everywhere it is used.
-- Edit name, real-world size, color and opacity.
-- Texture positioning: rotate, flip, scale, nudge, fit to face, align to edge, reset, copy/paste mapping.
+- Edit name, real-world size, color and opacity. Changes apply right away.
+- Texture positioning: rotate, flip, scale, nudge, fit to face, align to edge, reset, copy/paste mapping. It works on the selection, or on every face using the picked material when nothing is selected.
 - Manage the model's own materials and export materials or textures.
 
 **Import & polygon reduction (Skimp-style)**
 - Formats: GLB, glTF, FBX, OBJ/MTL, DAE, 3DS, STL, PLY, VRML, USDZ and SKP.
 - 3D preview with units and up axis, and reduction by percentage or error tolerance. UV seams, material borders and open edges are kept.
 - Hierarchy is preserved, and repeated meshes become components. Options: flat shaded, checker UV texture.
-- Simplify groups/components already in the model, and build accurate decimated proxies.
+- Simplify groups/components already in the model.
+- Redraws only on change, streams model geometry in slices, and cancels a running reduction when the settings change.
 - Replace Textures tool: keeps UVs; click affects one group, Shift+click the whole model.
 - Image files (jpg/png/bmp/tif/tga/gif/webp) import as materials. A size in the file name (e.g. `Oak_120x60cm.jpg`) sets the texture size.
 
-**Proxies for Enscape**
-- Light box or simplified proxies that keep the source model's path. The full geometry is removed from the file.
-- One click swaps everything to full models for rendering and back.
-
 **Interface**
-- Persian/English, light/dark theme, bundled Vazirmatn font.
+- Persian/English, light/dark theme, bundled Vazirmatn font. SketchUp's own menus, toolbar and right-click entries are always in English.
 
 Build the package with `python3 dev/build_rbz.py`. Run the core tests with `ruby dev/test_core.rb`.

@@ -26,7 +26,6 @@
     cardEls: {},
     replaceArmed: false,
     modelMats: [],
-    proxy: null,
     expanded: {},
     sideOpen: true
   };
@@ -371,7 +370,7 @@
   // ---------------------------------------------------------------- rendering: shell
   var VIEWS = [
     ['models', 'cube'], ['materials', 'swatch'], ['favorites', 'star'], ['recent', 'clock'],
-    ['inmodel', 'layers'], ['tools', 'tools'], ['proxy', 'proxy']
+    ['inmodel', 'layers'], ['tools', 'tools']
   ];
 
   function renderRail() {
@@ -392,7 +391,6 @@
     S.replaceArmed = S.replaceArmed && (v === 'materials' || v === 'inmodel' || v === 'favorites' || v === 'recent');
     renderAll();
     if (v === 'inmodel') loadModelMats();
-    if (v === 'proxy') call('proxy', { op: 'stats' }).then(function (s) { if (s) { S.proxy = s; renderContent(); } });
     if (v === 'tools') call('picked').then(function (p) { S.picked = p; renderContent(); renderStatus(); });
   }
 
@@ -407,6 +405,7 @@
     renderSideHead();
     renderTree();
     renderTopbar();
+    renderPins();
     renderContent();
     renderStatus();
   }
@@ -498,7 +497,7 @@
   function renderTopbar() {
     var v = S.view;
     var bar = $('topbar');
-    if (v === 'tools' || v === 'proxy' || v === 'settings') {
+    if (v === 'tools' || v === 'settings') {
       bar.innerHTML = '<b style="font-size:15px;padding:4px">' + esc(t('v_' + v)) + '</b>';
       return;
     }
@@ -508,7 +507,7 @@
       '<button class="clr' + (S.search ? '' : ' hidden') + '" data-act="clear-search">' + icon('x') + '</button></div>';
     if (v === 'models') {
       h += '<div class="seg" title="' + esc(t('place_mode')) + '">';
-      [['normal', 'pm_normal'], ['fit3', 'pm_fit3'], ['fit2', 'pm_fit2'], ['surface', 'pm_surface'], ['proxy', 'pm_proxy']].forEach(function (m) {
+      [['normal', 'pm_normal'], ['fit3', 'pm_fit3'], ['fit2', 'pm_fit2'], ['surface', 'pm_surface']].forEach(function (m) {
         h += '<button data-pm="' + m[0] + '" class="' + ((S.settings.place_mode || 'normal') === m[0] ? 'on' : '') + '" title="' + esc(t(m[1] + '_tip')) + '">' + esc(t(m[1])) + '</button>';
       });
       h += '</div>';
@@ -530,11 +529,66 @@
     if (hasTree()) {
       h += '<button class="btn icon' + (S.settings.recursive !== false ? ' on' : '') + '" data-act="recursive" title="' + esc(t('recursive_tip')) + '">' + icon('sub') + '</button>';
     }
+    if (v !== 'inmodel') {
+      h += '<button class="btn icon' + (S.settings.show_info ? ' on' : '') + '" data-act="toggle-info" title="' + esc(t('info_tip')) + '">' + icon('info') + '</button>';
+    }
     if (v === 'inmodel') {
       h += '<button class="btn" data-act="mm-refresh">' + icon('refresh') + '<span>' + esc(t('refresh')) + '</span></button>';
     }
     h += '<span class="size">' + icon('fit') + '<input type="range" id="csize" min="90" max="280" step="10" value="' + (S.settings.card_size || 150) + '"></span>';
     bar.innerHTML = h;
+  }
+
+  // ---------------------------------------------------------------- pinned folders
+  function pinList(view) {
+    var map = S.settings.pinned || {};
+    return (map[view || S.view] || []).slice();
+  }
+  function isPinned(p, view) { return pinList(view).indexOf(p) >= 0; }
+
+  function renderPins() {
+    var bar = $('pins');
+    var list = hasTree() ? pinList() : [];
+    if (!list.length) { bar.className = 'hidden'; bar.innerHTML = ''; return; }
+    var cat = viewCat();
+    var sel = S.folder[S.view];
+    var h = '<span class="pin-ic" title="' + esc(t('pinned_tip')) + '">' + icon('pin') + '</span>';
+    list.forEach(function (p) {
+      var node = findNode(p);
+      var name = node ? (node.root ? (node.root.name || node.n) : node.n) : basename(p);
+      h += '<button class="chip' + (sel === p ? ' on' : '') + (node ? '' : ' gone') + '" data-pin="' + esc(p) + '" title="' + esc(p) + '">' +
+        icon('folder') + '<span>' + esc(name) + '</span>' + (node ? '<i>' + node.cnt[cat] + '</i>' : '') + '</button>';
+    });
+    bar.className = '';
+    bar.innerHTML = h;
+  }
+
+  function togglePin(p) {
+    call('pin', { view: S.view, path: p }).then(function (map) {
+      if (!map) return;
+      S.settings.pinned = map;
+      renderPins(); renderCrumbs(S.list ? S.list.length : 0);
+      toast(isPinned(p) ? t('pin') : t('unpin'));
+    });
+  }
+
+  function pinMenu(e, p) {
+    var list = pinList();
+    var i = list.indexOf(p);
+    showMenu(e, [
+      { head: basename(p) },
+      { label: t('move_left'), icon: 'caret', disabled: i <= 0, action: function () { movePin(p, -1); } },
+      { label: t('move_right'), icon: 'caret', disabled: i >= list.length - 1, action: function () { movePin(p, 1); } },
+      { label: t('show_in_folder'), icon: 'folder', action: function () { call('reveal', { path: p }); } },
+      { sep: true },
+      { label: t('unpin'), icon: 'x', action: function () { togglePin(p); } }
+    ]);
+  }
+
+  function movePin(p, d) {
+    call('pin_move', { view: S.view, path: p, delta: d }).then(function (map) {
+      if (map) { S.settings.pinned = map; renderPins(); }
+    });
   }
 
   // ---------------------------------------------------------------- crumbs
@@ -564,6 +618,8 @@
     }
     h += '<span class="grow"></span><span class="cnt">' + count + ' ' + esc(t('items')) + '</span>';
     if (hasTree() && S.folder[v]) {
+      var pinned = isPinned(S.folder[v]);
+      h += '<button class="btn' + (pinned ? ' on' : '') + '" data-act="pin-here" title="' + esc(t(pinned ? 'unpin' : 'pin')) + '">' + icon('pin') + '</button>';
       h += '<button class="btn" data-act="mkdir" title="' + esc(t('new_folder')) + '">' + icon('folder-plus') + '</button>';
       if (v === 'models') h += '<button class="btn" data-act="save-sel-here" title="' + esc(t('save_sel_here_tip')) + '">' + icon('save') + '<span>' + esc(t('save_sel_here')) + '</span></button>';
       if (v === 'materials') h += '<button class="btn" data-act="import-mat-folder" title="' + esc(t('import_folder_mats')) + '">' + icon('plus') + '</button>';
@@ -588,7 +644,6 @@
     S.cardEls = {};
     if (observer) observer.disconnect();
     if (v === 'tools') { renderCrumbs(0); box.innerHTML = toolsHtml(); return; }
-    if (v === 'proxy') { renderCrumbs(0); box.innerHTML = proxyHtml(); return; }
     if (v === 'settings') { renderCrumbs(0); box.innerHTML = settingsHtml(); return; }
     if (v === 'inmodel') { renderModelMats(); return; }
     S.list = currentList();
@@ -648,10 +703,12 @@
       } else if (it.k === 'mesh') {
         ver = '<span class="ver">' + esc(it.e.toUpperCase()) + '</span>';
       }
-      var showExt = S.settings.show_ext ? ' <span class="ext">.' + esc(it.e) + '</span>' : '';
+      var info = !!S.settings.show_info;
+      var showExt = (S.settings.show_ext || info) ? '<span class="ext">.' + esc(it.e) + '</span>' : '';
+      if (info) card.className += ' info';
       card.innerHTML = '<div class="th" style="height:' + size + 'px"></div>' + ver +
         '<button class="fav' + (favs[it.p] ? ' on' : '') + '" data-act="fav" title="' + esc(t('favorite')) + '">' + icon('star') + '</button>' +
-        '<div class="cap">' + esc(it.n) + showExt + '</div>';
+        '<div class="cap">' + esc(it.n) + showExt + '</div>' + (info ? '<div class="meta">' + metaHtml(it) + '</div>' : '');
       setCardThumb(card, it);
       S.cardEls[it.p] = card;
       frag.appendChild(card);
@@ -662,6 +719,14 @@
     }
     grid.appendChild(frag);
     S.rendered = end;
+  }
+
+  function metaHtml(it) {
+    var bits = [];
+    if (it.s || it.s === 0) bits.push(fmtSize(it.s));
+    if (it.m) bits.push(fmtDate(it.m));
+    var folder = relFolder(it);
+    return '<span>' + esc(bits.join(' · ')) + '</span>' + (folder && S.search ? '<span class="fd">' + esc(folder) + '</span>' : '');
   }
 
   // ---------------------------------------------------------------- model materials view
@@ -701,6 +766,10 @@
     return 'background:' + (p.color || '#ccc');
   }
 
+  function pickedSub(p) {
+    return p.texture ? esc(p.width + ' × ' + p.height + ' cm') + (p.pixels ? ' · ' + p.pixels[0] + '×' + p.pixels[1] + ' px' : '') : esc(t('no_texture'));
+  }
+
   function toolsHtml() {
     var p = picked();
     var h = '<div class="panels">';
@@ -710,12 +779,13 @@
       '<button class="btn" data-tool="fit2">' + icon('fit') + '<span>' + esc(t('pm_fit2')) + '</span></button>' +
       '<button class="btn" data-tool="surface">' + icon('cube') + '<span>' + esc(t('pm_surface')) + '</span></button></div>' +
       '<div class="hint">' + t('tp_keys') + '</div>' +
+      '<div class="row"><label class="l">' + esc(t('place_rotate')) + '</label><input class="inp sm" type="number" id="place-rot" value="' + (S.settings.place_rotate || 90) + '"> °</div>' +
+      '<div class="hint">' + t('place_hint') + '</div>' +
       '<div class="row"><label class="l">' + esc(t('rotate_step')) + '</label><input class="inp sm" type="number" id="rot-step" value="' + (S.settings.rotate_step || 45) + '"> °</div></div>';
     // import & simplify (Skimp-style)
     h += '<div class="panel"><h3>' + icon('fit') + esc(t('tp_import')) + '</h3><div class="hint">' + esc(t('tp_import_hint')) + '</div>' +
       '<div class="row"><button class="btn pri" data-act="import-browse">' + icon('cube') + '<span>' + esc(t('import_model')) + '</span></button>' +
-      '<button class="btn" data-act="simplify-sel">' + icon('fit') + '<span>' + esc(t('simplify_sel')) + '</span></button>' +
-      '<button class="btn" data-act="proxy-dec">' + icon('proxy') + '<span>' + esc(t('px_decimated')) + '</span></button></div></div>';
+      '<button class="btn" data-act="simplify-sel">' + icon('fit') + '<span>' + esc(t('simplify_sel')) + '</span></button></div></div>';
     // material tools
     h += '<div class="panel"><h3>' + icon('dropper') + esc(t('tp_mat')) + '</h3><div class="hint">' + esc(t('tp_mat_hint')) + '</div>' +
       '<div class="row"><button class="btn pri" data-act="pick">' + icon('dropper') + '<span>' + esc(t('eyedropper')) + '</span></button>' +
@@ -732,10 +802,10 @@
       '<button class="btn" data-act="collect-tex">' + esc(t('collect_tex')) + '</button>' +
       '<button class="btn" data-act="mm-purge">' + esc(t('purge_unused')) + '</button></div></div>';
     // picked material editor
-    h += '<div class="panel"><h3>' + icon('swatch') + esc(t('tp_picked')) + '</h3>';
+    h += '<div class="panel" id="pm-panel"><h3>' + icon('swatch') + esc(t('tp_picked')) + '</h3>';
     if (p) {
-      h += '<div class="mat-head"><div class="sw" style="' + swatchStyle(p) + '"></div><div><div class="nm">' + esc(p.display) + '</div>' +
-        '<div class="sub">' + (p.texture ? esc(p.width + ' × ' + p.height + ' cm') + (p.pixels ? ' · ' + p.pixels[0] + '×' + p.pixels[1] + ' px' : '') : esc(t('no_texture'))) + '</div></div></div>' +
+      h += '<div class="mat-head"><div class="sw" id="pm-sw" style="' + swatchStyle(p) + '"></div><div><div class="nm" id="pm-nm">' + esc(p.display) + '</div>' +
+        '<div class="sub" id="pm-sub">' + pickedSub(p) + '</div></div></div>' +
         '<div class="row"><label class="l">' + esc(t('name')) + '</label><input class="inp grow" id="pm-name" value="' + esc(p.display) + '"></div>';
       if (p.texture) {
         h += '<div class="row"><label class="l">' + esc(t('tex_size')) + '</label><input class="inp sm" type="number" step="0.1" id="pm-w" value="' + p.width + '"> × ' +
@@ -746,7 +816,7 @@
         (p.texture ? '<span class="hint" style="margin:0">' + esc(t('colorize_hint')) + '</span>' : '') + '</div>' +
         '<div class="row"><label class="l">' + esc(t('opacity')) + '</label><input type="range" id="pm-alpha" min="0" max="100" value="' + Math.round((p.alpha == null ? 1 : p.alpha) * 100) + '" class="grow">' +
         '<span id="pm-alpha-v">' + Math.round((p.alpha == null ? 1 : p.alpha) * 100) + '%</span></div>' +
-        '<div class="row"><button class="btn pri" data-act="pm-apply">' + esc(t('apply_changes')) + '</button></div>';
+        '<div class="hint">' + esc(t('live_hint')) + '</div>';
     } else {
       h += '<div class="hint">' + esc(t('nothing_picked')) + '</div>';
     }
@@ -768,39 +838,6 @@
       '<label class="chk"><input type="checkbox" id="tex-groups"' + (S.settings.tex_include_groups !== false ? ' checked' : '') + '>' + esc(t('include_groups')) + '</label></div></div>';
     // path tools
     h += '<div class="panel"><h3>' + icon('path') + esc(t('tp_path')) + '</h3><div class="hint">' + esc(t('tp_path_hint')) + '</div></div>';
-    h += '</div>';
-    return h;
-  }
-
-  // ---------------------------------------------------------------- proxy view
-  function proxyHtml() {
-    var s = S.proxy || { proxies: 0, types: 0, full: 0, missing: 0, dir: '', mode: 'box' };
-    var h = '<div class="panels">';
-    h += '<div class="panel"><h3>' + icon('proxy') + esc(t('proxy_title')) + '</h3><div class="hint">' + esc(t('proxy_hint')) + '</div>' +
-      '<div class="stats"><div class="stat"><b>' + s.proxies + '</b><span>' + esc(t('px_proxies')) + '</span></div>' +
-      '<div class="stat"><b>' + s.types + '</b><span>' + esc(t('px_types')) + '</span></div>' +
-      '<div class="stat"><b>' + s.full + '</b><span>' + esc(t('px_full')) + '</span></div>' +
-      '<div class="stat' + (s.missing ? ' bad' : '') + '"><b>' + s.missing + '</b><span>' + esc(t('px_missing')) + '</span></div></div>' +
-      '<div class="row"><button class="btn pri" data-px="all_full">' + esc(t('px_all_full')) + '</button>' +
-      '<button class="btn" data-px="all_proxy">' + esc(t('px_all_proxy')) + '</button>' +
-      '<button class="btn icon" data-px="stats" title="' + esc(t('refresh')) + '">' + icon('refresh') + '</button></div>' +
-      '<div class="hint">' + esc(t('px_render_hint')) + '</div></div>';
-    h += '<div class="panel"><h3>' + icon('cube') + esc(t('px_selection')) + '</h3><div class="hint">' + esc(t('px_sel_hint')) + '</div>' +
-      '<div class="row"><button class="btn pri" data-px="make">' + esc(t('px_make')) + '</button>' +
-      '<button class="btn pri" data-px="decimated">' + esc(t('px_decimated')) + '</button>' +
-      '<button class="btn" data-px="sel_full">' + esc(t('px_sel_full')) + '</button>' +
-      '<button class="btn" data-px="sel_proxy">' + esc(t('px_sel_proxy')) + '</button></div>' +
-      '<div class="row"><button class="btn" data-px="open">' + esc(t('px_open')) + '</button>' +
-      '<button class="btn" data-px="regular">' + esc(t('px_regular')) + '</button></div></div>';
-    h += '<div class="panel"><h3>' + icon('gear') + esc(t('px_settings')) + '</h3>' +
-      '<div class="row"><label class="l">' + esc(t('px_mode')) + '</label><select id="px-mode">' +
-      '<option value="box"' + (S.settings.proxy_mode !== 'simplified' ? ' selected' : '') + '>' + esc(t('px_box')) + '</option>' +
-      '<option value="simplified"' + (S.settings.proxy_mode === 'simplified' ? ' selected' : '') + '>' + esc(t('px_simplified')) + '</option></select></div>' +
-      '<div class="row"><label class="l">' + esc(t('px_faces')) + '</label><input class="inp sm" type="number" id="px-faces" value="' + (S.settings.proxy_faces || 300) + '"></div>' +
-      '<div class="row"><label class="chk"><input type="checkbox" id="px-remove"' + (S.settings.proxy_remove_full !== false ? ' checked' : '') + '>' + esc(t('px_remove_full')) + '</label></div>' +
-      '<div class="row"><label class="l">' + esc(t('px_dir')) + '</label><span class="grow" style="direction:ltr;text-align:left;color:var(--muted);font-size:11.5px;word-break:break-all">' + esc(s.dir || '') + '</span>' +
-      '<button class="btn" data-px="choose_dir">' + esc(t('change')) + '</button></div>' +
-      '<div class="hint">' + esc(t('px_place_hint')) + '</div></div>';
     h += '</div>';
     return h;
   }
@@ -832,6 +869,8 @@
       '</select></div>' +
       '<div class="row"><label class="l">' + esc(t('img_width')) + '</label><input class="inp sm" type="number" id="set-imgw" value="' + (st.image_width_cm || 100) + '"> cm</div>' +
       '<div class="row"><label class="chk"><input type="checkbox" id="set-ext"' + (st.show_ext ? ' checked' : '') + '>' + esc(t('show_ext')) + '</label></div>' +
+      '<div class="row"><label class="chk"><input type="checkbox" id="set-info"' + (st.show_info ? ' checked' : '') + '>' + esc(t('show_info')) + '</label></div>' +
+      '<div class="row"><label class="l">' + esc(t('place_rotate')) + '</label><input class="inp sm" type="number" id="place-rot" value="' + (st.place_rotate || 90) + '"> °</div>' +
       '<div class="row"><button class="btn" data-act="clear-cache">' + esc(t('clear_cache')) + '</button><button class="btn" data-act="reset-window">' + esc(t('reset_window')) + '</button></div></div>';
     h += '<div class="panel"><h3>' + icon('layers') + 'Banian Browser</h3><div class="hint">' +
       esc(t('version')) + ': ' + esc(S.info.version || '') + '<br>SketchUp ' + esc(S.info.su_year || '') + '<br>' +
@@ -854,9 +893,21 @@
   }
 
   BB.on('picked', function (p) {
+    var prev = S.picked;
     S.picked = p;
     renderStatus();
-    if (S.view === 'tools') renderContent();
+    if (S.view === 'tools') {
+      // same material edited from the panel: refresh the header only, keep the inputs
+      if (p && prev && p.name === prev.name && !!p.texture === !!prev.texture && $('pm-sw')) {
+        $('pm-sw').setAttribute('style', swatchStyle(p));
+        $('pm-nm').textContent = p.display;
+        $('pm-sub').innerHTML = pickedSub(p);
+      } else {
+        var keep = $('content').scrollTop;
+        renderContent();
+        $('content').scrollTop = keep;
+      }
+    }
     if (S.view === 'inmodel') loadModelMats();
   });
   BB.on('index', function (idx) {
@@ -868,19 +919,17 @@
     if (hasTree() || S.view === 'favorites' || S.view === 'recent') {
       var keep = $('content').scrollTop;
       renderTree();
+      renderPins();
       renderContent();
       $('content').scrollTop = keep;
     }
     renderStatus();
   });
+  BB.on('placing', function (on) { S.placing = !!on; });
   BB.on('scanning', function (d) {
     S.scanning[d.root] = true;
     renderTree();
     renderStatus();
-  });
-  BB.on('proxy_stats', function (s) {
-    S.proxy = s;
-    if (S.view === 'proxy') renderContent();
   });
 
   // ---------------------------------------------------------------- item actions
@@ -1006,7 +1055,6 @@
         { label: t('pm_fit3_full'), icon: 'fit', action: function () { call('place', { path: it.p, mode: 'fit3' }); } },
         { label: t('pm_fit2_full'), icon: 'fit', action: function () { call('place', { path: it.p, mode: 'fit2' }); } },
         { label: t('pm_surface_full'), icon: 'cube', action: function () { call('place', { path: it.p, mode: 'surface' }); } },
-        { label: t('pm_proxy_full'), icon: 'proxy', action: function () { call('place', { path: it.p, mode: 'proxy' }); } },
         { sep: true },
         { label: t('replace_sel'), icon: 'refresh', action: function () { call('replace_sel', { path: it.p }); } },
         { label: t('array_path'), icon: 'path', action: function () { call('array_path', { path: it.p }); } },
@@ -1050,6 +1098,7 @@
       { label: t('add_files'), icon: 'plus', action: function () { call('add_files', { dest: p }); } },
       { label: t('show_in_folder'), icon: 'folder', action: function () { call('reveal', { path: p }); } },
       { label: t('rescan'), icon: 'refresh', action: function () { if (root) call('scan', { root: root.path }); } },
+      { label: isPinned(p) ? t('unpin') : t('pin'), icon: 'pin', action: function () { togglePin(p); } },
       { sep: true }
     ];
     if (S.view === 'models') items.push({ label: t('save_sel_here'), icon: 'save', action: function () { call('save_sel', { folder: p }); } });
@@ -1138,6 +1187,13 @@
         var q = $('q');
         if (q) { e.preventDefault(); q.focus(); q.select(); }
       }
+      // a library model is following the cursor in SketchUp but this window still has
+      // the keyboard: send the arrows (and Esc) to the placing tool
+      if (S.placing && !e.target.closest('input, textarea, select')) {
+        if (e.keyCode === 38 || e.keyCode === 39) { e.preventDefault(); call('place_turn', { dir: 1 }); return; }
+        if (e.keyCode === 40 || e.keyCode === 37) { e.preventDefault(); call('place_turn', { dir: -1 }); return; }
+        if (e.keyCode === 27) { call('place_cancel'); }
+      }
       if (e.keyCode === 27) {
         hideMenu();
         if (S.replaceArmed) { S.replaceArmed = false; renderStatus(); }
@@ -1211,6 +1267,19 @@
       runAct(act, a, e);
     });
 
+    $('pins').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pin]');
+      if (!b) return;
+      var p = b.getAttribute('data-pin');
+      if (!findNode(p)) { toast(t('missing'), true); return; }
+      selectFolder(S.folder[S.view] === p ? null : p);
+      renderPins();
+    });
+    $('pins').addEventListener('contextmenu', function (e) {
+      var b = e.target.closest('[data-pin]');
+      if (b) pinMenu(e, b.getAttribute('data-pin'));
+    });
+
     $('crumbs').addEventListener('click', function (e) {
       var c = e.target.closest('.cr');
       if (c) selectFolder(c.getAttribute('data-p'));
@@ -1265,7 +1334,6 @@
       }
       if (card && card.hasAttribute('data-i')) activate(itemByCard(card));
       onToolsClick(e);
-      onProxyClick(e);
       onSettingsClick(e);
     });
     content.addEventListener('contextmenu', function (e) {
@@ -1281,7 +1349,8 @@
     });
     content.addEventListener('change', onFormChange);
     content.addEventListener('input', function (e) {
-      if (e.target.id === 'pm-alpha') { var v = $('pm-alpha-v'); if (v) v.textContent = e.target.value + '%'; }
+      if (e.target.id === 'pm-alpha') { var v = $('pm-alpha-v'); if (v) v.textContent = e.target.value + '%'; livePicked('alpha', 250); }
+      if (e.target.id === 'pm-color') livePicked('color', 250);
       if (e.target.id === 'pm-w' && $('pm-lock') && $('pm-lock').checked && S.picked && S.picked.width) {
         $('pm-h').value = (+e.target.value * S.picked.height / S.picked.width).toFixed(2);
       }
@@ -1332,12 +1401,15 @@
       case 'collect-tex': call('collect_tex', {}).then(function (n) { if (n) toast(t('exported') + ' (' + n + ')'); }); break;
       case 'tex-rot-custom': texOp('rotate', +($('tex-ang').value || 0)); break;
       case 'tex-scale-custom': texOp('scale', +($('tex-scale').value || 1)); break;
-      case 'pm-apply': applyPicked(); break;
       case 'clear-cache': call('clear_thumb_cache').then(function () { S.thumbs = {}; S.requested = {}; toast(t('done')); }); break;
       case 'reset-window': call('reset_window'); break;
       case 'import-browse': call('import_browse'); break;
       case 'simplify-sel': call('simplify_sel'); break;
-      case 'proxy-dec': call('proxy', { op: 'decimated' }); break;
+      case 'pin-here': if (S.folder[S.view]) togglePin(S.folder[S.view]); break;
+      case 'toggle-info':
+        saveSettings({ show_info: !S.settings.show_info });
+        renderTopbar(); renderContent();
+        break;
       case 'replace-tex': call('replace_tex_tool'); break;
       case 'import-mat-folder':
         call('import_mat_folder', { folder: S.view === 'materials' ? S.folder.materials : null }).then(function (n) { if (n) toast(t('added') + ' (' + n + ')'); });
@@ -1374,32 +1446,37 @@
     }
   }
 
-  function applyPicked() {
-    var p = S.picked;
-    if (!p) return;
-    var props = {};
-    var name = $('pm-name').value.trim();
-    if (name && name !== p.display) props.name = name;
-    if ($('pm-w')) { props.width = +$('pm-w').value; props.height = +$('pm-h').value; }
-    var a = +$('pm-alpha').value / 100;
-    if (Math.abs(a - (p.alpha == null ? 1 : p.alpha)) > 0.004) props.alpha = a;
-    var c = $('pm-color').value;
-    if (c && c.toLowerCase() !== (p.color || '').toLowerCase()) props.color = c;
-    call('mat_props', { name: p.name, props: props }).then(function (ok) { if (ok) toast(t('done')); });
+  // The picked-material editor applies every change right away (no Apply button).
+  var liveTimer = null, livePending = {};
+  function livePicked(what, delay) {
+    livePending[what] = true;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(flushPicked, delay || 0);
   }
-
-  function onProxyClick(e) {
-    if (S.view !== 'proxy') return;
-    var b = e.target.closest('[data-px]');
-    if (!b) return;
-    var op = b.getAttribute('data-px');
-    var args = { op: op };
-    if (op === 'make') args.mode = S.settings.proxy_mode || 'box';
-    call('proxy', args).then(function (r) {
-      if (op === 'stats' || op === 'choose_dir') { if (r) { S.proxy = r; renderContent(); } return; }
-      if (typeof r === 'number' && r > 0) toast(t('done') + ' (' + r + ')');
-      call('proxy', { op: 'stats' }).then(function (s) { if (s) { S.proxy = s; renderContent(); } });
-    });
+  function flushPicked() {
+    var p = S.picked;
+    var what = livePending;
+    livePending = {};
+    if (!p || !$('pm-name')) return;
+    var props = {};
+    if (what.name) {
+      var name = $('pm-name').value.trim();
+      if (name && name !== p.display) props.name = name;
+    }
+    if (what.size && $('pm-w')) {
+      var w = +$('pm-w').value, h = +$('pm-h').value;
+      if (w > 0 && h > 0 && (Math.abs(w - p.width) > 0.001 || Math.abs(h - p.height) > 0.001)) { props.width = w; props.height = h; }
+    }
+    if (what.alpha) {
+      var a = +$('pm-alpha').value / 100;
+      if (Math.abs(a - (p.alpha == null ? 1 : p.alpha)) > 0.004) props.alpha = a;
+    }
+    if (what.color) {
+      var c = $('pm-color').value;
+      if (c && c.toLowerCase() !== (p.color || '').toLowerCase()) props.color = c;
+    }
+    if (!Object.keys(props).length) return;
+    call('mat_props', { name: p.name, props: props });
   }
 
   function onSettingsClick(e) {
@@ -1432,12 +1509,15 @@
     if (id === 'set-paint') saveSettings({ paint_tool: e.target.value });
     if (id === 'set-imgw') saveSettings({ image_width_cm: +e.target.value || 100 });
     if (id === 'set-ext') { saveSettings({ show_ext: e.target.checked }); }
+    if (id === 'set-info') { saveSettings({ show_info: e.target.checked }); }
+    if (id === 'place-rot') saveSettings({ place_rotate: Math.max(1, Math.min(360, +e.target.value || 90)) });
     if (id === 'rot-step') saveSettings({ rotate_step: +e.target.value || 45 });
+    if (id === 'pm-name') livePicked('name');
+    if (id === 'pm-w' || id === 'pm-h') livePicked('size');
+    if (id === 'pm-color') livePicked('color');
+    if (id === 'pm-alpha') livePicked('alpha');
     if (id === 'tex-groups') saveSettings({ tex_include_groups: e.target.checked });
     if (id === 'tex-step') saveSettings({ tex_nudge: +e.target.value || 0.1 });
-    if (id === 'px-mode') saveSettings({ proxy_mode: e.target.value });
-    if (id === 'px-faces') saveSettings({ proxy_faces: Math.max(20, +e.target.value || 300) });
-    if (id === 'px-remove') saveSettings({ proxy_remove_full: e.target.checked });
   }
 
   // ---------------------------------------------------------------- start
@@ -1461,7 +1541,6 @@
         rebuild();
         renderAll();
         if (S.view === 'inmodel') loadModelMats();
-        if (S.view === 'proxy') call('proxy', { op: 'stats' }).then(function (s) { if (s) { S.proxy = s; renderContent(); } });
       });
     });
   }

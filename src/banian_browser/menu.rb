@@ -1,10 +1,11 @@
 module BanianStudio
   module BanianBrowser
-    # Extensions menu, toolbar and right-click menu.
+    # Extensions menu, toolbar and right-click menu. Always in English: SketchUp's own
+    # menus are English and right-to-left text does not display well inside them.
     module Menu
       class << self
         def t(key)
-          I18n.t(key)
+          I18n.en(key)
         end
 
         def icon(name)
@@ -52,17 +53,8 @@ module BanianStudio
           c[:fit] = command(:tex_fit, 'tex_fit') { TextureTools.fit }
           c[:align] = command(:tex_align) { TextureTools.align }
           c[:reset] = command(:tex_reset) { TextureTools.reset }
-          c[:proxy_box] = command(:proxy_make_box, 'proxy') { Proxy.convert_selection('box') }
-          c[:proxy_simple] = command(:proxy_make_simple) { Proxy.convert_selection('simplified') }
-          c[:all_full] = command(:proxy_all_full, 'proxy_full') { Proxy.to_full('all') }
-          c[:all_proxy] = command(:proxy_all_proxy, 'proxy_back') { Proxy.to_proxy('all') }
-          c[:sel_full] = command(:proxy_sel_full) { Proxy.to_full('selection') }
-          c[:sel_proxy] = command(:proxy_sel_proxy) { Proxy.to_proxy('selection') }
-          c[:proxy_open] = command(:proxy_open) { Proxy.open_source }
-          c[:proxy_regular] = command(:proxy_regular) { Proxy.make_regular }
           c[:import] = command(:import_model, 'import') { Importer.browse_and_open }
           c[:simplify] = command(:simplify_sel, 'simplify') { Importer.open_selection('simplify') }
-          c[:proxy_dec] = command(:proxy_decimated) { Importer.open_selection('proxy') }
           c[:replace_tex] = command(:replace_tex, 'replace_tex') { model.select_tool(ReplaceTextureTool.new) }
           c[:imp_mat] = command(:import_mat_file) do
             Dialog.show
@@ -82,8 +74,7 @@ module BanianStudio
           end
 
           has_sel = proc { model.selection.empty? ? MF_GRAYED : MF_ENABLED }
-          [:rot, :rot_ccw, :rot180, :flip_h, :flip_v, :fit, :align, :reset, :proxy_box, :proxy_simple,
-           :sel_full, :sel_proxy, :proxy_open, :proxy_regular, :save_sel, :simplify, :proxy_dec].each do |k|
+          [:save_sel, :simplify].each do |k|
             c[k].set_validation_proc(&has_sel)
           end
 
@@ -100,19 +91,13 @@ module BanianStudio
           root.add_item(c[:imp_mat_dir])
           tex = root.add_submenu(t(:texture))
           [:rot, :rot_ccw, :rot180, :flip_h, :flip_v, :fit, :align, :reset].each { |k| tex.add_item(c[k]) }
-          px = root.add_submenu(t(:proxy))
-          [:proxy_box, :proxy_simple, :proxy_dec].each { |k| px.add_item(c[k]) }
-          px.add_separator
-          [:all_full, :all_proxy].each { |k| px.add_item(c[k]) }
-          px.add_separator
-          [:sel_full, :sel_proxy, :proxy_open, :proxy_regular].each { |k| px.add_item(c[k]) }
           root.add_item(c[:save_sel])
           root.add_separator
           root.add_item(c[:reset_win])
           root.add_item(c[:about])
 
           tb = UI::Toolbar.new('Banian Browser')
-          [:open, :import, :simplify, :pick, :bucket, :replace_tex, :rot, :fit, :proxy_box, :all_full, :all_proxy].each { |k| tb.add_item(c[k]) }
+          [:open, :import, :simplify, :pick, :bucket, :replace_tex, :rot, :fit].each { |k| tb.add_item(c[k]) }
           state = tb.get_last_state
           if state == TB_NEVER_SHOWN
             tb.show
@@ -130,8 +115,6 @@ module BanianStudio
               [:rot, :rot_ccw, :rot180, :flip_h, :flip_v, :fit, :align, :reset].each { |k| ts.add_item(c[k]) }
             end
             unless Util.instances_in(sel.to_a).empty?
-              ps = sub.add_submenu(t(:proxy))
-              [:proxy_box, :proxy_simple, :proxy_dec, :sel_full, :sel_proxy, :proxy_open, :proxy_regular].each { |k| ps.add_item(c[k]) }
               sub.add_item(c[:simplify])
               sub.add_item(c[:save_sel])
             end

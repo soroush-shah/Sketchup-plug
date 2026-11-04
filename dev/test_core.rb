@@ -137,8 +137,58 @@ check('move file', mv['moved'].length == 1 && File.exist?(mv['moved'][0]))
 check('favorite toggle', BB::Settings.toggle_favorite(mv['moved'][0]) == true)
 BB::Library.delete([mv['moved'][0]])
 check('delete file + forget favorite', !File.exist?(mv['moved'][0]) && BB::Settings['favorites'].empty?)
+# pinned folders
+fur = BB::Util.norm(File.join(lib, 'Furniture'))
+mats_dir = BB::Util.norm(File.join(lib, 'Materials'))
+BB::Settings.toggle_pin('models', fur)
+BB::Settings.toggle_pin('models', mats_dir)
+BB::Settings.toggle_pin('materials', mats_dir)
+check('pin per view', BB::Settings['pinned']['models'] == [fur, mats_dir] && BB::Settings['pinned']['materials'] == [mats_dir])
+BB::Settings.move_pin('models', mats_dir, -1)
+check('pin reorder', BB::Settings['pinned']['models'] == [mats_dir, fur])
+BB::Settings.rename_path(fur, fur + ' 2')
+check('pin follows rename', BB::Settings['pinned']['models'].include?(fur + ' 2'))
+BB::Settings.forget_path(mats_dir)
+check('pin forgotten with folder', BB::Settings['pinned']['models'] == [fur + ' 2'] && BB::Settings['pinned']['materials'].empty?)
+BB::Settings.toggle_pin('models', fur + ' 2')
+check('unpin', BB::Settings['pinned']['models'].empty?)
+check('menus are English', BB::I18n.en(:open_browser) == 'Open Banian Browser')
 check('settings persisted as json', JSON.parse(File.read(BB::Settings.file))['roots'].length == 1)
 check('i18n fa/en', BB::I18n.t(:yes) == 'بله' && (BB::Settings['language'] = 'en') && BB::I18n.t(:yes) == 'Yes')
+
+# placing tool: arrow keys turn by the place_rotate setting (logic only, no geometry)
+VK_UP = 38; VK_DOWN = 40; VK_LEFT = 37; VK_RIGHT = 39; COPY_MODIFIER_KEY = 17
+module Sketchup
+  class InputPoint; def valid?; false; end; end
+  class << self
+    attr_accessor :status_text, :vcb_label, :vcb_value
+    def active_model
+      v = Object.new
+      def v.invalidate; end
+      m = Object.new
+      m.define_singleton_method(:active_view) { v }
+      m
+    end
+  end
+end
+module Geom; class Transformation; end; end
+require File.join(BB::PLUGIN_DIR, 'tools', 'tool_base')
+require File.join(BB::PLUGIN_DIR, 'tools', 'place_tool')
+bounds = Object.new
+defn = Object.new
+defn.define_singleton_method(:bounds) { bounds }
+defn.define_singleton_method(:entities) { [] }
+tool = BB::PlaceTool.new(defn)
+tool.activate
+BB::Settings['place_rotate'] = 90
+tool.onKeyDown(VK_UP, false, 0, nil)
+check('Up turns by 90', tool.instance_variable_get(:@angle) == 90.0 && BB::PlaceTool.current == tool)
+BB::Settings['place_rotate'] = 45
+tool.turn(-1)
+tool.onKeyDown(VK_DOWN, false, 0, nil)
+check('step from settings, Down / forwarded turn', tool.instance_variable_get(:@angle) == 0.0)
+check('status shows step', Sketchup.status_text.to_s.include?('45'))
+check('placing announced to the window', BB::Dialog.events.any? { |e, d| e == 'placing' && d == true })
 
 FileUtils.rm_rf(tmp)
 puts $fails.zero? ? "\nALL PASSED" : "\n#{$fails} FAILED"

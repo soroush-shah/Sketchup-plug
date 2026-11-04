@@ -52,9 +52,6 @@ module BanianStudio
         # Main entry from the browser: place according to the chosen mode.
         def place(path, mode = nil)
           mode ||= Settings['place_mode']
-          if mode == 'proxy'
-            return Proxy.place_as_proxy(path)
-          end
           d = load_definition(path)
           return false unless d
           self.last_definition = d
@@ -63,7 +60,7 @@ module BanianStudio
           when 'fit3' then model.select_tool(FitPlaceTool.new(d, 'three'))
           when 'fit2' then model.select_tool(FitPlaceTool.new(d, 'two'))
           when 'surface' then model.select_tool(SurfacePlaceTool.new(d))
-          else model.place_component(d, false)
+          else model.select_tool(PlaceTool.new(d))
           end
           true
         end

@@ -11,7 +11,6 @@ module BanianStudio
           :import_title => 'Import 3D model',
           :import_model => 'Import 3D Model (preview + reduce)...',
           :simplify_sel => 'Simplify Selection (reduce polygons)...',
-          :proxy_decimated => 'Accurate Proxy (polygon reduction)...',
           :replace_tex => 'Replace Textures Tool',
           :import_mat_file => 'Import Material / Image...',
           :import_mat_folder => 'Import Folder of Images as Materials...',
@@ -31,15 +30,6 @@ module BanianStudio
           :tex_fit => 'Fit Texture to Face',
           :tex_align => 'Align Texture to Longest Edge',
           :tex_reset => 'Reset Texture Position',
-          :proxy => 'Proxy (Enscape)',
-          :proxy_make_box => 'Convert Selection to Proxy (Box)',
-          :proxy_make_simple => 'Convert Selection to Proxy (Simplified)',
-          :proxy_all_full => 'Show Full Models (for Rendering)',
-          :proxy_all_proxy => 'Back to Proxies',
-          :proxy_sel_full => 'Selected: Proxy → Full Model',
-          :proxy_sel_proxy => 'Selected: Full Model → Proxy',
-          :proxy_open => 'Open Original Model',
-          :proxy_regular => 'Convert to Regular Component',
           :save_to_library => 'Save Selection to Library...',
           :reset_window => 'Reset Window Position',
           :about => 'About Banian Browser',
@@ -75,13 +65,9 @@ module BanianStudio
           :no_profile => 'This model has no face to use as a profile.',
           :op_sweep => 'Banian: Sweep Profile',
           :sweep_failed => 'Sweep failed.',
-          :op_proxy => 'Banian: Create Proxy',
-          :proxy_failed => 'Proxy operation failed.',
           :op_to_full => 'Banian: Show Full Models',
-          :proxy_missing => 'These source files were not found:',
           :no_proxies => 'There are no proxies to convert.',
           :no_full => 'There are no linked full models to convert.',
-          :select_proxy => 'Select a proxy (or a linked model) first.',
           :op_regular => 'Banian: Make Regular',
           :picker_status => 'Click a face or object to pick its material.',
           :picked => 'Picked',
@@ -98,6 +84,7 @@ module BanianStudio
           :switch_mode => 'Switch Mode (Tab)',
           :op_place => 'Banian: Place Model',
           :surface_status => 'Click to place on a surface  |  ←/→ rotate  |  Shift: lock surface',
+          :place_status => 'Click to place  |  ↑/↓ rotate %s°  |  type an angle  |  Ctrl: place several',
           :align_normal => 'aligned to face',
           :align_upright => 'upright',
           :angle => 'Angle',
@@ -113,7 +100,6 @@ module BanianStudio
           :import_title => 'ایمپورت مدل سه‌بعدی',
           :import_model => 'ایمپورت مدل سه‌بعدی (پیش‌نمایش + کاهش پلیگان)...',
           :simplify_sel => 'ساده‌سازی انتخاب (کاهش پلیگان)...',
-          :proxy_decimated => 'پراکسی دقیق (کاهش پلیگان)...',
           :replace_tex => 'ابزار جایگزینی تکسچر',
           :import_mat_file => 'ایمپورت متریال / تصویر...',
           :import_mat_folder => 'ایمپورت پوشه تصاویر به عنوان متریال...',
@@ -133,15 +119,6 @@ module BanianStudio
           :tex_fit => 'فیت کردن تکسچر روی سطح',
           :tex_align => 'هم‌راستا با بلندترین لبه',
           :tex_reset => 'بازنشانی موقعیت تکسچر',
-          :proxy => 'پراکسی (Enscape)',
-          :proxy_make_box => 'تبدیل انتخاب به پراکسی (جعبه)',
-          :proxy_make_simple => 'تبدیل انتخاب به پراکسی (ساده‌شده)',
-          :proxy_all_full => 'نمایش مدل‌های کامل (برای رندر)',
-          :proxy_all_proxy => 'برگشت به پراکسی',
-          :proxy_sel_full => 'انتخاب‌شده: پراکسی ← مدل کامل',
-          :proxy_sel_proxy => 'انتخاب‌شده: مدل کامل ← پراکسی',
-          :proxy_open => 'باز کردن مدل اصلی',
-          :proxy_regular => 'تبدیل به کامپوننت معمولی',
           :save_to_library => 'ذخیره انتخاب در کتابخانه...',
           :reset_window => 'بازنشانی موقعیت پنجره',
           :about => 'درباره بانیان بروزر',
@@ -177,13 +154,9 @@ module BanianStudio
           :no_profile => 'این مدل سطحی برای استفاده به عنوان پروفیل ندارد.',
           :op_sweep => 'بانیان: اکسترود پروفیل',
           :sweep_failed => 'اکسترود پروفیل انجام نشد.',
-          :op_proxy => 'بانیان: ساخت پراکسی',
-          :proxy_failed => 'عملیات پراکسی انجام نشد.',
           :op_to_full => 'بانیان: نمایش مدل‌های کامل',
-          :proxy_missing => 'این فایل‌های اصلی پیدا نشدند:',
           :no_proxies => 'پراکسی‌ای برای تبدیل وجود ندارد.',
           :no_full => 'مدل کامل لینک‌شده‌ای برای تبدیل وجود ندارد.',
-          :select_proxy => 'ابتدا یک پراکسی (یا مدل لینک‌شده) انتخاب کنید.',
           :op_regular => 'بانیان: تبدیل به معمولی',
           :picker_status => 'روی یک سطح یا آبجکت کلیک کنید تا متریالش برداشته شود.',
           :picked => 'برداشته شد',
@@ -200,6 +173,7 @@ module BanianStudio
           :switch_mode => 'تغییر حالت (Tab)',
           :op_place => 'بانیان: قرار دادن مدل',
           :surface_status => 'برای قرار دادن روی سطح کلیک کنید  |  ←/→ چرخش  |  Shift: قفل سطح',
+          :place_status => 'برای قرار دادن کلیک کنید  |  ↑/↓ چرخش %s درجه  |  تایپ زاویه  |  Ctrl: چند نسخه',
           :align_normal => 'هم‌راستا با سطح',
           :align_upright => 'ایستاده',
           :angle => 'زاویه',
@@ -217,6 +191,11 @@ module BanianStudio
 
       def self.t(key)
         STRINGS[lang][key] || STRINGS[:en][key] || key.to_s
+      end
+
+      # SketchUp menus, toolbar and right-click entries are always English.
+      def self.en(key)
+        STRINGS[:en][key] || key.to_s
       end
     end
   end

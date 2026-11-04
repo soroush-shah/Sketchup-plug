@@ -44,6 +44,15 @@ const check = (n, c) => { console.log((c ? 'PASS ' : 'FAIL ') + n); if (!c) fail
   const g = await BBDecimate.simplify(grid(60), { ratio: 0.01 });
   console.log(`grid ${g.before} -> ${g.after}`);
   check('flat grid collapses strongly but keeps material border', g.after < g.before * 0.2 && new Set(g.groups).size === 2);
+  const sp = sphere(120, 80);
+  const W = BBDecimate.weld(sp, true);
+  const a1 = await BBDecimate.simplify(sp, { ratio: 0.3, welded: W });
+  const a2 = await BBDecimate.simplify(sp, { ratio: 0.3, welded: W });
+  check('cached weld can be reused', a1.after === a2.after && a1.after < a1.before * 0.31);
+  const big = sphere(500, 300);
+  let calls = 0;
+  const c = await BBDecimate.simplify(big, { ratio: 0.05, cancelled: () => ++calls > 1 });
+  check('cancel stops early', c === null);
   const same = await BBDecimate.simplify(grid(10), { ratio: 1 });
   check('ratio 1 keeps everything', same.after === same.before);
   console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

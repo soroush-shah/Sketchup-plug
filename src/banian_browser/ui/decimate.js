@@ -5,6 +5,8 @@
  *                indices: Uint32Array(m*3), groups: Int32Array(m)|null }  (material per triangle)
  *     opts   : { ratio: 0..1 (target fraction of triangles), tolerance: max error distance
  *                (same units as positions, 0 = off), keepSeams: true, keepBorders: true }
+ *              + welded: BBDecimate.weld(input, keepSeams) result to reuse between runs,
+ *                cancelled: function () -> true to stop early (resolves null)
  *     result : same layout as input, plus { before, after }
  *
  * Vertices are welded by position (+ UV + material when keepSeams). UV seams, material
@@ -58,6 +60,36 @@
     return true;
   };
 
+  // Open-addressing hash of integer tuples -> id (much faster than string keys).
+  function TupleMap(cap, width) {
+    var size = 16;
+    while (size < cap * 2) size <<= 1;
+    this.mask = size - 1;
+    this.slots = fillNeg(new Int32Array(size));
+    this.keys = new Float64Array(Math.max(16, cap * width));
+    this.w = width;
+    this.n = 0;
+  }
+  function fillNeg(a) { for (var i = 0; i < a.length; i++) a[i] = -1; return a; }
+  // returns existing id, or the new id (== previous count) when inserted
+  TupleMap.prototype.get = function (k) {
+    var w = this.w, h = 0, i, j;
+    for (i = 0; i < w; i++) { h = Math.imul(h ^ (k[i] | 0), 0x9e3779b1) ^ ((k[i] / 4294967296) | 0); h = (h << 13) | (h >>> 19); }
+    var s = (h >>> 0) & this.mask;
+    for (;;) {
+      var id = this.slots[s];
+      if (id < 0) {
+        this.slots[s] = this.n;
+        for (j = 0; j < w; j++) this.keys[this.n * w + j] = k[j];
+        return this.n++;
+      }
+      var o = id * w, eq = true;
+      for (j = 0; j < w; j++) if (this.keys[o + j] !== k[j]) { eq = false; break; }
+      if (eq) return id;
+      s = (s + 1) & this.mask;
+    }
+  };
+
   function weld(input, keepSeams) {
     var P = input.positions, UV = input.uvs, I = input.indices, G = input.groups;
     var n = P.length / 3;
@@ -70,10 +102,7 @@
     }
     var diag = Math.sqrt((maxX - minX) * (maxX - minX) + (maxY - minY) * (maxY - minY) + (maxZ - minZ) * (maxZ - minZ)) || 1;
     var q = 1e-6 * diag;
-    var map = {};
-    var pos = [], uv = [], vgroup = [];
-    var remap = new Int32Array(n);
-    var triGroup = G || null;
+    var useUV = keepSeams && UV;
     // vertex -> group: when keepSeams we weld per material group, so a vertex used by
     // two materials is split and the material border becomes a locked border.
     var vertGroupOfTri = null;
@@ -83,29 +112,37 @@
         vertGroupOfTri[I[t0 * 3]] = G[t0]; vertGroupOfTri[I[t0 * 3 + 1]] = G[t0]; vertGroupOfTri[I[t0 * 3 + 2]] = G[t0];
       }
     }
+    var width = 3 + (useUV ? 2 : 0) + (vertGroupOfTri ? 1 : 0);
+    var map = new TupleMap(n, width);
+    var key = new Float64Array(width);
+    var pos = new Float64Array(n * 3), uv = UV ? new Float64Array(n * 2) : null;
+    var remap = new Int32Array(n);
     for (var v = 0; v < n; v++) {
-      var key = Math.round(P[v * 3] / q) + '_' + Math.round(P[v * 3 + 1] / q) + '_' + Math.round(P[v * 3 + 2] / q);
-      if (keepSeams && UV) key += '_' + Math.round(UV[v * 2] * 1e5) + '_' + Math.round(UV[v * 2 + 1] * 1e5);
-      if (vertGroupOfTri) key += '_' + vertGroupOfTri[v];
-      var id = map[key];
-      if (id === undefined) {
-        id = pos.length / 3;
-        map[key] = id;
-        pos.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]);
-        if (UV) uv.push(UV[v * 2], UV[v * 2 + 1]);
+      key[0] = Math.round((P[v * 3] - minX) / q); key[1] = Math.round((P[v * 3 + 1] - minY) / q); key[2] = Math.round((P[v * 3 + 2] - minZ) / q);
+      var w = 3;
+      if (useUV) { key[w++] = Math.round(UV[v * 2] * 1e5); key[w++] = Math.round(UV[v * 2 + 1] * 1e5); }
+      if (vertGroupOfTri) key[w] = vertGroupOfTri[v];
+      var before = map.n;
+      var id = map.get(key);
+      if (id === before) {
+        pos[id * 3] = P[v * 3]; pos[id * 3 + 1] = P[v * 3 + 1]; pos[id * 3 + 2] = P[v * 3 + 2];
+        if (uv) { uv[id * 2] = UV[v * 2]; uv[id * 2 + 1] = UV[v * 2 + 1]; }
       }
       remap[v] = id;
     }
-    var tris = [];
-    var groups = [];
+    var nv = map.n;
     var m = I.length / 3;
+    var tris = new Int32Array(m * 3), groups = new Int32Array(m), k = 0;
     for (var t = 0; t < m; t++) {
       var a = remap[I[t * 3]], b = remap[I[t * 3 + 1]], c = remap[I[t * 3 + 2]];
       if (a === b || b === c || a === c) continue;
-      tris.push(a, b, c);
-      groups.push(triGroup ? triGroup[t] : 0);
+      tris[k * 3] = a; tris[k * 3 + 1] = b; tris[k * 3 + 2] = c;
+      groups[k++] = G ? G[t] : 0;
     }
-    return { pos: new Float64Array(pos), uv: UV ? new Float64Array(uv) : null, tris: new Int32Array(tris), groups: new Int32Array(groups), diag: diag };
+    return {
+      pos: pos.subarray(0, nv * 3), uv: uv ? uv.subarray(0, nv * 2) : null,
+      tris: tris.subarray(0, k * 3), groups: groups.subarray(0, k), diag: diag
+    };
   }
 
   function planeOf(pos, a, b, c, out) {
@@ -142,12 +179,13 @@
     var tol = opts.tolerance > 0 ? opts.tolerance : 0;
     var keepSeams = opts.keepSeams !== false;
     var keepBorders = opts.keepBorders !== false;
+    var cancelled = opts.cancelled || function () { return false; };
     return new Promise(function (resolve) {
-      var W = weld(input, keepSeams);
-      var pos = W.pos, tris = W.tris, nV = pos.length / 3, nT = tris.length / 3;
+      var W = opts.welded || weld(input, keepSeams);
+      var pos = W.pos, tris = new Int32Array(W.tris), nV = pos.length / 3, nT = tris.length / 3;
       var before = input.indices.length / 3;
       var target = Math.max(1, Math.floor(before * ratio));
-      if (ratio >= 0.999 && !tol) { resolve(finish(W, null, before)); return; }
+      if (ratio >= 0.999 && !tol) { resolve(finish(W, tris, null, before)); return; }
 
       // vertex -> triangle lists
       var vt = new Array(nV);
@@ -157,23 +195,30 @@
       // quadrics + border detection
       var Q = new Float64Array(nV * 10);
       var plane = [0, 0, 0, 0];
-      var edgeCount = {};
+      var ekeys = new Float64Array(nT * 3);
       for (t = 0; t < nT; t++) {
         var a = tris[t * 3], b = tris[t * 3 + 1], c = tris[t * 3 + 2];
         if (planeOf(pos, a, b, c, plane)) { addPlane(Q, a, plane, 1); addPlane(Q, b, plane, 1); addPlane(Q, c, plane, 1); }
-        countEdge(edgeCount, a, b); countEdge(edgeCount, b, c); countEdge(edgeCount, c, a);
+        ekeys[t * 3] = a < b ? a * nV + b : b * nV + a;
+        ekeys[t * 3 + 1] = b < c ? b * nV + c : c * nV + b;
+        ekeys[t * 3 + 2] = c < a ? c * nV + a : a * nV + c;
       }
+      ekeys.sort();
       var locked = new Uint8Array(nV);
       var edges = [];
-      Object.keys(edgeCount).forEach(function (k) {
-        var s = k.split('_');
-        var u = +s[0], v = +s[1];
-        if (edgeCount[k] === 1) {
-          if (keepBorders) { locked[u] = 1; locked[v] = 1; } else addBorderQuadric(Q, pos, vt, tris, u, v);
+      for (var e0 = 0; e0 < ekeys.length;) {
+        var e1 = e0 + 1;
+        while (e1 < ekeys.length && ekeys[e1] === ekeys[e0]) e1++;
+        var u0 = Math.floor(ekeys[e0] / nV), v0 = ekeys[e0] - u0 * nV;
+        if (e1 - e0 === 1) {
+          if (keepBorders) { locked[u0] = 1; locked[v0] = 1; } else addBorderQuadric(Q, pos, vt, tris, u0, v0);
         }
-        edges.push(u, v);
-      });
-      edgeCount = null;
+        edges.push(u0, v0);
+        e0 = e1;
+      }
+      ekeys = null;
+      var markA = new Int32Array(nV), markB = new Int32Array(nV), epoch = 0;
+      var markT = new Int32Array(nT), tEpoch = 0;
 
       var alive = new Uint8Array(nT); for (t = 0; t < nT; t++) alive[t] = 1;
       var vdead = new Uint8Array(nV);
@@ -199,16 +244,16 @@
 
       function canCollapse(u, v) {
         // link condition: u and v must share at most two neighbours (manifold)
-        var shared = 0, seen = {};
+        var shared = 0;
         var lu = vt[u], lv = vt[v], k, j, tt, w;
+        epoch++;
         for (k = 0; k < lu.length; k++) {
           tt = lu[k]; if (!alive[tt]) continue;
-          for (j = 0; j < 3; j++) { w = tris[tt * 3 + j]; if (w !== u) seen[w] = 1; }
+          for (j = 0; j < 3; j++) { w = tris[tt * 3 + j]; if (w !== u) markA[w] = epoch; }
         }
-        var counted = {};
         for (k = 0; k < lv.length; k++) {
           tt = lv[k]; if (!alive[tt]) continue;
-          for (j = 0; j < 3; j++) { w = tris[tt * 3 + j]; if (w !== v && w !== u && seen[w] && !counted[w]) { counted[w] = 1; shared++; } }
+          for (j = 0; j < 3; j++) { w = tris[tt * 3 + j]; if (w !== v && w !== u && markA[w] === epoch && markB[w] !== epoch) { markB[w] = epoch; shared++; } }
         }
         if (shared > 2) return false;
         // no flipped or degenerate triangles around u
@@ -244,16 +289,18 @@
         var ou = u * 10, ov = v * 10;
         for (k = 0; k < 10; k++) Q[ov + k] += Q[ou + k];
         // compact v's list and refresh its edges
-        var fresh = [], nb = {};
+        var fresh = [], nb = [];
+        tEpoch++; epoch++;
         for (k = 0; k < lv.length; k++) {
           var t2 = lv[k];
-          if (!alive[t2] || fresh.indexOf(t2) >= 0) continue;
+          if (!alive[t2] || markT[t2] === tEpoch) continue;
+          markT[t2] = tEpoch;
           fresh.push(t2);
-          for (var j = 0; j < 3; j++) { var w = tris[t2 * 3 + j]; if (w !== v) nb[w] = 1; }
+          for (var j = 0; j < 3; j++) { var w = tris[t2 * 3 + j]; if (w !== v && markA[w] !== epoch) { markA[w] = epoch; nb.push(w); } }
         }
         vt[v] = fresh;
         stamp[v]++;
-        Object.keys(nb).forEach(function (w) { push(v, +w); });
+        for (k = 0; k < nb.length; k++) push(v, nb[k]);
       }
 
       function valid(from, to, st) {
@@ -262,6 +309,7 @@
       }
 
       function run() {
+        if (cancelled()) { resolve(null); return; }
         var t0 = Date.now();
         while (live > target && heap.pop(out)) {
           var cost = out[0], from = out[1], to = out[2];
@@ -277,7 +325,7 @@
           }
         }
         if (onProgress) onProgress(1);
-        resolve(finish(W, alive, before));
+        resolve(finish(W, tris, alive, before));
       }
 
       function shareTri(u, v) {
@@ -291,11 +339,6 @@
 
       run();
     });
-  }
-
-  function countEdge(map, a, b) {
-    var k = a < b ? a + '_' + b : b + '_' + a;
-    map[k] = (map[k] || 0) + 1;
   }
 
   function addBorderQuadric(Q, pos, vt, tris, u, v) {
@@ -332,8 +375,8 @@
     return true;
   }
 
-  function finish(W, alive, before) {
-    var tris = W.tris, nT = tris.length / 3;
+  function finish(W, tris, alive, before) {
+    var nT = tris.length / 3;
     var used = new Int32Array(W.pos.length / 3); for (var i = 0; i < used.length; i++) used[i] = -1;
     var pos = [], uv = [], idx = [], grp = [];
     for (var t = 0; t < nT; t++) {
@@ -359,5 +402,5 @@
     };
   }
 
-  root.BBDecimate = { simplify: simplify };
+  root.BBDecimate = { simplify: simplify, weld: weld };
 })(typeof window !== 'undefined' ? window : this);

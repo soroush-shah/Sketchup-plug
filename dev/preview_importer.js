@@ -24,9 +24,15 @@ const ratio = process.argv[4] ? +process.argv[4] : 1;
         for (let r = 0; r <= ring; r++) for (let s = 0; s <= seg; s++) { const th = Math.PI * r / ring, ph = 2 * Math.PI * s / seg;
           P.push(+(20 * Math.sin(th) * Math.cos(ph)).toFixed(4), +(20 * Math.sin(th) * Math.sin(ph)).toFixed(4), +(20 + 20 * Math.cos(th)).toFixed(4)); UV.push(s / seg * 4, r / ring * 2); }
         for (let r = 0; r < ring; r++) for (let s = 0; s < seg; s++) { const a = r * (seg + 1) + s, b = a + seg + 1; T.push(a, b, a + 1, a + 1, b, b + 1); }
-        data = { materials: [{ name: 'Wood', color: '#c8743d', opacity: 1, tex: { path: path.join(process.env.FIX || '', 'tex/wood.png') } }],
-          nodes: [{ n: 'Ball', m: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], g: 'd0', c: [{ n: 'Copy', m: [1,0,0,0, 0,1,0,0, 0,0,1,0, 60,0,0,1], g: 'd0', c: [] }] }],
-          geoms: { d0: [{ mat: 0, pts: P, uvs: UV, tris: T }] } };
+        data = { nodes: [{ n: 'Ball', m: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], g: 'd0', c: [{ n: 'Copy', m: [1,0,0,0, 0,1,0,0, 0,0,1,0, 60,0,0,1], g: 'd0', c: [] }] }], faces: T.length / 3 };
+        const mats = [{ name: 'Wood', color: '#c8743d', opacity: 1, tex: { path: path.join(process.env.FIX || '', 'tex/wood.png') } }];
+        setTimeout(async () => {
+          // two slices like the Ruby side, then the materials
+          const half = T.length / 2;
+          await page.evaluate((g) => BI.emit('mgeom', g), { key: 'd0', faces: half / 3, parts: [{ mat: 0, pts: P, uvs: UV, tris: T.slice(0, half) }] });
+          await page.evaluate((g) => BI.emit('mgeom', g), { key: 'd0', faces: half / 3, parts: [{ mat: 0, pts: P, uvs: UV, tris: T.slice(half) }] });
+          await page.evaluate((d) => BI.emit('mgeom_done', d), { materials: mats });
+        }, 20);
         break;
       }
       case 'init': if (MODEL) { data = { mode: 'simplify', lang: 'en', theme: 'dark', settings: {}, su: 26 }; break; }

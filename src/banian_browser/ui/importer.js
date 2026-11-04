@@ -17,10 +17,9 @@
       keep_seams: 'حفظ درزهای UV و مرز متریال‌ها', keep_borders: 'حفظ لبه‌های باز',
       preview: 'پیش‌نمایش کاهش', reset: 'بدون کاهش', options: 'گزینه‌ها',
       flat: 'سطوح تخت (بدون نرم‌کردن)', placeholder: 'تکسچر شطرنجی برای بررسی UV', components: 'کامپوننت برای مش‌های تکراری',
-      tint: 'رنگ متریال روی تکسچر', import: 'ایمپورت', apply: 'اعمال', make_proxy: 'ساخت پراکسی', cancel: 'انصراف',
+      tint: 'رنگ متریال روی تکسچر', import: 'ایمپورت', apply: 'اعمال', cancel: 'انصراف',
       wire: 'وایرفریم', tex: 'تکسچر', fit: 'نمای کامل', done: 'انجام شد',
-      t_file: 'ایمپورت مدل', t_skp: 'ایمپورت و ساده‌سازی SKP', t_simplify: 'ساده‌سازی انتخاب', t_proxy: 'پراکسی دقیق (کاهش پلیگان)',
-      proxy_hint: 'مدل کامل در فایل جدا نگه داشته می‌شود و یک نسخه سبک‌شده با همان شکل جایگزین آن می‌شود.',
+      t_file: 'ایمپورت مدل', t_skp: 'ایمپورت و ساده‌سازی SKP', t_simplify: 'ساده‌سازی انتخاب',
       simplify_hint: 'هندسه همه نمونه‌های این کامپوننت‌ها ساده می‌شود. سلسله‌مراتب گروه‌ها حفظ می‌شود.',
       small_fix: 'مدل خیلی کوچک است؛ برای جلوگیری از حذف سطوح ریز، داخل یک کامپوننت با مقیاس ساخته می‌شود.',
       no_webgl: 'پیش‌نمایش سه‌بعدی در این نسخه اسکچ‌آپ در دسترس نیست، ولی ایمپورت انجام می‌شود.',
@@ -36,10 +35,9 @@
       keep_seams: 'Keep UV seams and material borders', keep_borders: 'Keep open edges',
       preview: 'Preview reduction', reset: 'No reduction', options: 'Options',
       flat: 'Flat shaded (no smoothing)', placeholder: 'Checker texture to inspect UVs', components: 'Components for repeated meshes',
-      tint: 'Tint textures with material color', import: 'Import', apply: 'Apply', make_proxy: 'Create proxy', cancel: 'Cancel',
+      tint: 'Tint textures with material color', import: 'Import', apply: 'Apply', cancel: 'Cancel',
       wire: 'Wireframe', tex: 'Textures', fit: 'Zoom extents', done: 'Done',
-      t_file: 'Import model', t_skp: 'Import & simplify SKP', t_simplify: 'Simplify selection', t_proxy: 'Accurate proxy (polygon reduction)',
-      proxy_hint: 'The full model is kept in a separate file and replaced by a lighter version with the same shape.',
+      t_file: 'Import model', t_skp: 'Import & simplify SKP', t_simplify: 'Simplify selection',
       simplify_hint: 'Geometry of all instances of these components is simplified. Group hierarchy is kept.',
       small_fix: 'The model is very small; it is built scaled inside a component so tiny faces are not lost.',
       no_webgl: '3D preview is not available in this SketchUp version, but importing still works.',
@@ -189,13 +187,14 @@
             ctx.putImageData(img, 0, 0);
             imageCache[p] = { image: cv, path: res.path };
             list.forEach(function (tx) { tx.image = cv; tx.flipY = !d.flipY; tx.needsUpdate = true; });
+            redraw();
           } catch (e) { /* preview without it */ }
           return;
         }
         return new Promise(function (resolve) {
           var url = URL.createObjectURL(new Blob([res.buffer]));
           var img = new Image();
-          img.onload = function () { imageCache[p] = { image: img, path: res.path }; list.forEach(function (tx) { tx.image = img; tx.needsUpdate = true; }); resolve(); };
+          img.onload = function () { imageCache[p] = { image: img, path: res.path }; list.forEach(function (tx) { tx.image = img; tx.needsUpdate = true; }); redraw(); resolve(); };
           img.onerror = function () { resolve(); };
           img.src = url;
         });
@@ -216,11 +215,13 @@
 
   // ------------------------------------------------------------------ three.js scene
   var renderer, scene, camera, controls, holder, grid;
+  var dirty = true;
+  function redraw() { dirty = true; }
   function initView() {
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true });
     } catch (e) { S.webgl = false; return; }
-    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
     renderer.outputEncoding = THREE.sRGBEncoding;
     $('view').insertBefore(renderer.domElement, $('ov'));
     renderer.setClearColor(document.body.className === 'dark' ? 0x2a3236 : 0xeef1f0, 1);
@@ -232,15 +233,22 @@
     var dl2 = new THREE.DirectionalLight(0xffffff, 0.25); dl2.position.set(-1.5, 1, 0.6); scene.add(dl2);
     holder = new THREE.Group(); scene.add(holder);
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
+    controls.addEventListener('change', redraw);
     window.addEventListener('resize', resize);
     resize();
-    (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+    // render only when something changed: keeps SketchUp responsive with heavy models
+    (function loop() {
+      requestAnimationFrame(loop);
+      if (!dirty) return;
+      dirty = false;
+      renderer.render(scene, camera);
+    })();
   }
   function resize() {
     if (!renderer) return;
     var v = $('view'); var w = v.clientWidth, h = v.clientHeight;
     renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+    redraw();
   }
   function bbox() {
     holder.updateMatrixWorld(true);
@@ -260,6 +268,7 @@
     grid = new THREE.GridHelper(step * 10, 10, dark ? 0x56635f : 0xb7c2be, dark ? 0x3a4447 : 0xdde3e0);
     grid.rotation.x = Math.PI / 2; grid.position.set(c.x, c.y, b.min.z);
     scene.add(grid);
+    redraw();
   }
 
   // ------------------------------------------------------------------ loading
@@ -360,7 +369,30 @@
     });
   }
 
-  // Builds three.js objects from SketchUp data (simplify / skp / proxy modes).
+  // Geometry of the selection arrives in slices ('mgeom') so SketchUp stays responsive.
+  function loadModelData() {
+    busy(t('parsing'), 0);
+    return new Promise(function (resolve) {
+      var data = { nodes: [], geoms: {}, materials: [] }, total = 1, got = 0;
+      BI.on('mgeom', function (g) {
+        var list = data.geoms[g.key] || (data.geoms[g.key] = []);
+        for (var i = 0; i < g.parts.length; i++) list.push(g.parts[i]);
+        got += g.faces || 0;
+        busy(t('parsing'), Math.min(0.95, got / total));
+      });
+      BI.on('mgeom_done', function (d) {
+        data.materials = d.materials || [];
+        if (d.error) toast(d.error, true);
+        resolve(data);
+      });
+      call('model_data').then(function (info) {
+        data.nodes = info.nodes || [];
+        total = Math.max(1, info.faces || 0);
+      });
+    });
+  }
+
+  // Builds three.js objects from SketchUp data (simplify / skp modes).
   function buildFromModel(data) {
     var mats = (data.materials || []).map(function (m) {
       var mat = new THREE.MeshStandardMaterial({ color: m.color || '#cccccc', roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
@@ -494,6 +526,7 @@
     holder.rotation.set(S.mode === 'file' && S.up === 'Y' ? Math.PI / 2 : 0, 0, S.rot * Math.PI / 180);
     holder.scale.set(s, s, s);
     holder.updateMatrixWorld(true);
+    redraw();
   }
   function guessUnits() {
     var b = new THREE.Box3().setFromObject(S.content);
@@ -515,38 +548,59 @@
   }
 
   // ------------------------------------------------------------------ reduction
-  var reducing = false;
+  // Every call cancels a run still in progress and starts over with the current
+  // settings, so dragging the slider never queues work or shows stale results.
+  var reduceGen = 0, reducing = null;
   function runReduction() {
-    if (reducing) return Promise.resolve();
-    reducing = true;
+    var gen = ++reduceGen;
+    var stale = function () { return gen !== reduceGen; };
     var ratio = S.useTol ? 0 : S.ratio;
     var list = S.entries.slice();
     var total = 0; list.forEach(function (e) { total += e.tris; });
     var done = 0, i = 0;
+    S.reduced = false;
     busy(t('reducing'), 0);
     function next() {
-      if (i >= list.length) return Promise.resolve();
+      if (stale()) return Promise.resolve(false);
+      if (i >= list.length) return Promise.resolve(true);
       var e = list[i++];
       if (!S.useTol && ratio >= 0.999) { e.reduced = null; setGeo(e, e.geo); done += e.tris; return next(); }
       var scale = (e.meshes[0].matrixWorld.getMaxScaleOnAxis() || 1);
       var tolLocal = S.useTol ? S.tolerance / scale : 0;
-      return BBDecimate.simplify(e.input, { ratio: ratio, tolerance: tolLocal, keepSeams: S.keepSeams, keepBorders: S.keepBorders }, function (p) {
-        busy(t('reducing'), (done + p * e.tris) / Math.max(1, total));
+      var wk = S.keepSeams ? 'w1' : 'w0';
+      if (!e[wk]) e[wk] = BBDecimate.weld(e.input, S.keepSeams);
+      return BBDecimate.simplify(e.input, {
+        ratio: ratio, tolerance: tolLocal, keepSeams: S.keepSeams, keepBorders: S.keepBorders,
+        welded: e[wk], cancelled: stale
+      }, function (p) {
+        if (!stale()) busy(t('reducing'), (done + p * e.tris) / Math.max(1, total));
       }).then(function (r) {
+        if (!r || stale()) return false;
         done += e.tris;
         e.reduced = r;
         setGeo(e, toGeometry(r));
-        return next();
+        // let the dialog breathe between big meshes
+        return tick().then(next);
       });
     }
-    return next().then(function () {
-      reducing = false; S.reduced = true; busy(false); renderStats();
-    }, function (err) { reducing = false; busy(false); toast(String(err && err.message || err), true); });
+    reducing = tick().then(next).then(function (ok) {
+      if (stale()) return reducing;
+      reducing = null; S.reduced = !!ok; busy(false); renderStats();
+      return ok;
+    }, function (err) {
+      if (!stale()) { reducing = null; busy(false); toast(String(err && err.message || err), true); }
+    });
+    return reducing;
   }
   function setGeo(e, geo) {
+    var old = e.meshes[0] && e.meshes[0].geometry;
     e.meshes.forEach(function (m) { m.geometry = geo; });
+    if (old && old !== geo && old !== e.geo) old.dispose();
+    redraw();
   }
   function clearReduction() {
+    reduceGen++;
+    busy(false);
     S.entries.forEach(function (e) { e.reduced = null; setGeo(e, e.geo); });
     renderStats();
   }
@@ -576,6 +630,7 @@
       m.side = THREE.DoubleSide;
       m.needsUpdate = true;
     });
+    redraw();
   }
 
   // ------------------------------------------------------------------ export to Ruby
@@ -607,6 +662,15 @@
   // single UV inside a part (SketchUp merges equal points in a PolygonMesh).
   function toParts(d, matIdOf, scale, uvFlipOf) {
     var P = d.positions, UV = d.uvs, I = d.indices, G = d.groups;
+    var nv = P.length / 3, pk = new Array(nv), uk = new Array(nv);
+    function pkey(v) {
+      var k = pk[v];
+      if (k === undefined) {
+        k = pk[v] = Math.round(P[v * 3] * scale * 1e4) + ',' + Math.round(P[v * 3 + 1] * scale * 1e4) + ',' + Math.round(P[v * 3 + 2] * scale * 1e4);
+        uk[v] = UV ? Math.round(UV[v * 2] * 1e5) + ',' + Math.round(UV[v * 2 + 1] * 1e5) : '';
+      }
+      return k;
+    }
     var byMat = {}, order = [];
     for (var t = 0; t < I.length / 3; t++) {
       var id = matIdOf(G[t]);
@@ -621,11 +685,7 @@
       newPart();
       list.forEach(function (tri) {
         var vs = [I[tri * 3], I[tri * 3 + 1], I[tri * 3 + 2]], keys = [], uvk = [];
-        for (var j = 0; j < 3; j++) {
-          var v = vs[j];
-          keys.push(Math.round(P[v * 3] * scale * 1e4) + ',' + Math.round(P[v * 3 + 1] * scale * 1e4) + ',' + Math.round(P[v * 3 + 2] * scale * 1e4));
-          uvk.push(UV ? Math.round(UV[v * 2] * 1e5) + ',' + Math.round(UV[v * 2 + 1] * 1e5) : '');
-        }
+        for (var j = 0; j < 3; j++) { keys.push(pkey(vs[j])); uvk.push(uk[vs[j]]); }
         var part = null;
         for (var k = 0; k < local.length && !part; k++) {
           var ok = true;
@@ -634,7 +694,7 @@
         }
         if (!part) part = local.length < 24 ? newPart() : local[local.length - 1];
         for (j = 0; j < 3; j++) {
-          var vk = keys[j] + '|' + uvk[j];
+          var vk = UV ? keys[j] + '|' + uvk[j] : keys[j];
           var ix = part.vmap[vk];
           if (ix === undefined) {
             ix = part.pts.length / 3; part.vmap[vk] = ix; part.pmap[keys[j]] = uvk[j];
@@ -752,7 +812,6 @@
     var h = '';
     var title = t('t_' + S.mode);
     h += '<h2>' + esc(S.file ? S.file.name : title) + '</h2>' + (S.file ? '<div class="sub">' + esc(title) + ' · ' + S.file.ext.toUpperCase() + ' · ' + (S.file.size / 1048576).toFixed(1) + ' MB</div>' : '<div class="sub"></div>');
-    if (S.mode === 'proxy') h += '<div class="hint">' + esc(t('proxy_hint')) + '</div>';
     if (S.mode === 'simplify' || S.mode === 'skp') h += '<div class="hint">' + esc(t('simplify_hint')) + '</div>';
     if (!S.webgl) h += '<div class="warn">' + esc(t('no_webgl')) + '</div>';
     if (S.mode === 'file') {
@@ -780,7 +839,7 @@
     if (S.missing.length) h += '<div class="warn">' + esc(t('missing_tex')) + ':<br>' + S.missing.map(esc).join('<br>') + '</div>';
     if (S.k > 1) h += '<div class="hint">' + esc(t('small_fix')) + '</div>';
     $('panel').innerHTML = h;
-    var main = S.mode === 'file' ? t('import') : (S.mode === 'proxy' ? t('make_proxy') : t('apply'));
+    var main = S.mode === 'file' ? t('import') : t('apply');
     $('foot').innerHTML = '<button class="btn" data-act="cancel">' + esc(t('cancel')) + '</button><button class="btn pri" data-act="go">' + icon('down') + '<span>' + esc(main) + '</span></button>';
     $('vtools').innerHTML = S.webgl ? '<button class="btn' + (S.wire ? ' on' : '') + '" data-act="wire">' + icon('grid') + '<span>' + esc(t('wire')) + '</span></button>' +
       '<button class="btn' + (S.showTex ? ' on' : '') + '" data-act="tex">' + icon('swatch') + '<span>' + esc(t('tex')) + '</span></button>' +
@@ -828,7 +887,12 @@
       if (a === 'tex') { S.showTex = !S.showTex; applyLook(); renderPanel(); }
       if (a === 'fit') fitView();
       if (a === 'cancel') call('close');
-      if (a === 'go') { saveSettings(); if (S.mode !== 'file' && !S.reduced) runReduction().then(finish); else finish(); }
+      if (a === 'go') {
+        saveSettings();
+        if (reducing) reducing.then(function (ok) { if (ok) finish(); });
+        else if (S.mode !== 'file' && !S.reduced) runReduction().then(function (ok) { if (ok) finish(); });
+        else finish();
+      }
     });
     document.addEventListener('input', function (e) {
       if (e.target.id === 'pct') { S.ratio = +e.target.value / 100; $('pctv').textContent = e.target.value + '%'; }
@@ -836,9 +900,9 @@
     });
     document.addEventListener('change', function (e) {
       var id = e.target.id, on = e.target.checked;
-      if (id === 'pct') { var tt = totals(); if (tt.before < 400000) runReduction(); }
-      if (id === 'o-seams') S.keepSeams = on;
-      if (id === 'o-borders') S.keepBorders = on;
+      if (id === 'pct') runReduction();
+      if (id === 'o-seams') { S.keepSeams = on; if (S.reduced || reducing) runReduction(); }
+      if (id === 'o-borders') { S.keepBorders = on; if (S.reduced || reducing) runReduction(); }
       if (id === 'o-flat') { S.flat = on; applyLook(); }
       if (id === 'o-ph') { S.placeholder = on; applyLook(); }
       if (id === 'o-comp') S.components = on;
@@ -870,19 +934,21 @@
       document.documentElement.setAttribute('dir', lang === 'en' ? 'ltr' : 'rtl');
       document.body.className = info.theme === 'dark' ? 'dark' : '';
       var st = info.settings || {};
-      S.ratioKey = S.mode === 'file' ? 'import_ratio' : (S.mode === 'proxy' ? 'proxy_ratio' : 'simplify_ratio');
-      S.ratio = (st[S.ratioKey] || { import_ratio: 100, proxy_ratio: 10, simplify_ratio: 50 }[S.ratioKey]) / 100;
+      S.ratioKey = S.mode === 'file' ? 'import_ratio' : 'simplify_ratio';
+      S.ratio = (st[S.ratioKey] || { import_ratio: 100, simplify_ratio: 50 }[S.ratioKey]) / 100;
       S.tolerance = st.import_tolerance || 0.5;
-      S.useTol = !!st.import_use_tol && S.mode !== 'proxy';
+      S.useTol = !!st.import_use_tol;
       S.keepSeams = st.import_keep_seams !== false; S.keepBorders = st.import_keep_borders !== false;
       S.flat = !!st.import_flat; S.components = st.import_components !== false; S.tint = !!st.import_tint;
       if (S.file) S.dir = S.file.dir;
       initView();
       renderPanel();
-      var load = S.mode === 'file' ? loadFile() : call('model_data').then(function (d) {
-        busy(t('parsing'), 0.5);
-        var root = buildFromModel(d);
-        return loadTextures().then(function () { return root; });
+      var load = S.mode === 'file' ? loadFile() : loadModelData().then(function (d) {
+        busy(t('parsing'), 0.95);
+        return tick().then(function () {
+          var root = buildFromModel(d);
+          return loadTextures().then(function () { return root; });
+        });
       });
       return load.then(function (obj) {
         S.content = obj;

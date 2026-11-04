@@ -156,6 +156,20 @@ module BanianStudio
         puts "[Banian Browser] #{msg.join(' ')}"
       end
 
+      # Removes an unused definition (keeps the file small after cancelled imports).
+      def remove_definition(d)
+        return unless d && d.valid?
+        return if d.instances.length > 0
+        defs = Sketchup.active_model.definitions
+        if defs.respond_to?(:remove)
+          defs.remove(d)
+        else
+          d.entities.clear!
+        end
+      rescue StandardError => e
+        log_error(e, 'remove definition')
+      end
+
       def log_error(err, where = nil)
         log("Error#{where ? " in #{where}" : ''}: #{err.class}: #{err.message}")
         bt = err.backtrace

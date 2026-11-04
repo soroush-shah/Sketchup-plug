@@ -23,7 +23,9 @@
       simplify_hint: 'هندسه همه نمونه‌های این کامپوننت‌ها ساده می‌شود. سلسله‌مراتب گروه‌ها حفظ می‌شود.',
       small_fix: 'مدل خیلی کوچک است؛ برای جلوگیری از حذف سطوح ریز، داخل یک کامپوننت با مقیاس ساخته می‌شود.',
       no_webgl: 'پیش‌نمایش سه‌بعدی در این نسخه اسکچ‌آپ در دسترس نیست، ولی ایمپورت انجام می‌شود.',
-      missing_tex: 'تکسچر پیدا نشد'
+      missing_tex: 'تکسچر پیدا نشد',
+      fsize: 'حجم فایل', fs_model: 'مدل فعلی', fs_unsaved: 'هنوز ذخیره نشده', fs_source: 'فایل منبع',
+      fs_geom: 'هندسه انتخاب‌شده', fs_add: 'اضافه به مدل', fs_after: 'مدل بعد از ذخیره', fs_note: 'تخمینی است؛ حجم واقعی بعد از ذخیره در اسکچ‌آپ مشخص می‌شود. تکسچرها با کاهش پلیگان کم نمی‌شوند.'
     },
     en: {
       loading: 'Reading file…', parsing: 'Processing model…', textures: 'Loading textures…',
@@ -41,7 +43,9 @@
       simplify_hint: 'Geometry of all instances of these components is simplified. Group hierarchy is kept.',
       small_fix: 'The model is very small; it is built scaled inside a component so tiny faces are not lost.',
       no_webgl: '3D preview is not available in this SketchUp version, but importing still works.',
-      missing_tex: 'Texture not found'
+      missing_tex: 'Texture not found',
+      fsize: 'File size', fs_model: 'Current model', fs_unsaved: 'not saved yet', fs_source: 'Source file',
+      fs_geom: 'Selected geometry', fs_add: 'Added to model', fs_after: 'Model after saving', fs_note: 'Estimate; the real size is known after saving in SketchUp. Textures do not shrink with polygon reduction.'
     }
   };
   var lang = 'fa';
@@ -175,6 +179,7 @@
       return readFile(p).then(function (res) {
         var list = texReg[p];
         if (!res) { S.missing.push(p); return; }
+        S.texBytes += res.buffer.byteLength;
         list.forEach(function (tx) { tx.userData.path = res.path; });
         var ext = extOf(res.path);
         if (ext === 'tga' || ext === 'tif' || ext === 'tiff') {
@@ -209,7 +214,7 @@
     units: 'auto', unitGuess: 'm', up: 'Y', rot: 0,
     entries: [], byKey: {}, ratio: 1, tolerance: 0, useTol: false,
     keepSeams: true, keepBorders: true, flat: false, placeholder: false, components: true, tint: false,
-    wire: false, showTex: true, missing: [], webgl: true, reduced: false
+    wire: false, showTex: true, missing: [], webgl: true, reduced: false, texBytes: 0, size: {}, selFaces: 0
   };
   var UNIT_CM = { m: 100, cm: 1, mm: 0.1, in: 2.54, ft: 30.48 };
 
@@ -387,6 +392,7 @@
       });
       call('model_data').then(function (info) {
         data.nodes = info.nodes || [];
+        S.selFaces = info.faces || 0;
         total = Math.max(1, info.faces || 0);
       });
     });
@@ -831,6 +837,7 @@
     }
     h += chk('o-seams', S.keepSeams, t('keep_seams')) + chk('o-borders', S.keepBorders, t('keep_borders')) +
       '<div class="row"><button class="btn pri" data-act="reduce">' + esc(t('preview')) + '</button><button class="btn" data-act="noreduce">' + esc(t('reset')) + '</button></div></div>';
+    h += '<div class="sec"><h4>' + icon('down') + esc(t('fsize')) + '</h4><div id="fsize"></div><div class="hint">' + esc(t('fs_note')) + '</div></div>';
     h += '<div class="sec"><h4>' + icon('gear') + esc(t('options')) + '</h4>' + chk('o-flat', S.flat, t('flat'));
     if (S.mode === 'file') {
       h += chk('o-ph', S.placeholder, t('placeholder')) + chk('o-comp', S.components, t('components')) + chk('o-tint', S.tint, t('tint'));
@@ -847,6 +854,52 @@
     renderStats();
   }
 
+  // ------------------------------------------------------------------ file size estimate
+  function fmtMB(b) {
+    if (b == null || isNaN(b)) return '–';
+    var mb = b / 1048576;
+    return (mb < 10 ? mb.toFixed(2) : mb < 100 ? mb.toFixed(1) : Math.round(mb)) + ' MB';
+  }
+  // ratio: fraction of (unique) triangles kept; pass the slider value while dragging
+  function sizeEstimate(ratioOverride) {
+    var z = S.size || {}, bpf = z.bytes_per_face || 150;
+    var before = 0, after = 0;
+    S.entries.forEach(function (e) { before += e.tris; after += e.reduced ? e.reduced.after : e.tris; });
+    var r = ratioOverride != null ? ratioOverride : (before ? after / before : 1);
+    var out = { model: z.model_size == null ? null : z.model_size };
+    if (S.mode === 'file') {
+      var tex = S.placeholder ? 20000 : S.texBytes;
+      out.source = z.source_size;
+      out.add = Math.round(before * r) * bpf * 0.85 + tex; // imported faces are triangles
+      out.after = out.model != null ? out.model + out.add : null;
+    } else if (S.mode === 'skp') {
+      var src = z.source_size || 0;
+      var geo = Math.min(src * 0.95, S.selFaces * bpf);
+      out.source = src;
+      out.add = src - geo + geo * r;
+      out.after = out.model != null ? out.model + out.add : null;
+    } else {
+      out.geomBefore = S.selFaces * bpf;
+      out.geomAfter = out.geomBefore * r;
+      out.after = out.model != null ? Math.max(out.model - out.geomBefore + out.geomAfter, out.geomAfter) : null;
+    }
+    return out;
+  }
+  function sizeHtml(est) {
+    var row = function (label, val) { return '<div class="row"><label class="l">' + esc(label) + '</label><span class="num ltr" dir="ltr">' + val + '</span></div>'; };
+    var h = row(t('fs_model'), est.model != null ? fmtMB(est.model) : esc(t('fs_unsaved')));
+    if (est.source != null) h += row(t('fs_source'), fmtMB(est.source));
+    if (est.add != null) h += row(t('fs_add'), '≈ ' + fmtMB(est.add));
+    if (est.geomBefore != null) h += row(t('fs_geom'), fmtMB(est.geomBefore) + ' → ≈ ' + fmtMB(est.geomAfter));
+    if (est.after != null) h += row(t('fs_after'), '<b>≈ ' + fmtMB(est.after) + '</b>' + (est.model ? ' (' + (est.after >= est.model ? '+' : '−') + fmtMB(Math.abs(est.after - est.model)) + ')' : ''));
+    return h;
+  }
+  function renderSize(ratioOverride) {
+    var box = $('fsize');
+    if (!box || !S.entries.length) return;
+    box.innerHTML = sizeHtml(sizeEstimate(ratioOverride));
+  }
+
   function renderStats() {
     var tt = totals();
     var pct = tt.before ? Math.round(tt.after / tt.before * 100) : 100;
@@ -859,7 +912,15 @@
       h += '<div class="chip">' + esc(t('size')) + ': <b class="num">' + dims + '</b></div>';
       if ($('dims')) $('dims').textContent = dims;
     }
+    if (S.entries.length) {
+      var est = sizeEstimate(), txt;
+      if (est.model != null) txt = fmtMB(est.model) + ' → ≈ ' + fmtMB(est.after);
+      else if (est.geomBefore != null) txt = fmtMB(est.geomBefore) + ' → ≈ ' + fmtMB(est.geomAfter);
+      else txt = '+ ≈ ' + fmtMB(est.add);
+      h += '<div class="chip">' + esc(t('fsize')) + ': <b class="num ltr" dir="ltr">' + txt + '</b></div>';
+    }
     $('ov').innerHTML = h;
+    renderSize();
   }
 
   function saveSettings() {
@@ -895,7 +956,7 @@
       }
     });
     document.addEventListener('input', function (e) {
-      if (e.target.id === 'pct') { S.ratio = +e.target.value / 100; $('pctv').textContent = e.target.value + '%'; }
+      if (e.target.id === 'pct') { S.ratio = +e.target.value / 100; $('pctv').textContent = e.target.value + '%'; renderSize(S.ratio); }
       if (e.target.id === 'tol') S.tolerance = Math.max(0, +e.target.value || 0);
     });
     document.addEventListener('change', function (e) {
@@ -904,7 +965,7 @@
       if (id === 'o-seams') { S.keepSeams = on; if (S.reduced || reducing) runReduction(); }
       if (id === 'o-borders') { S.keepBorders = on; if (S.reduced || reducing) runReduction(); }
       if (id === 'o-flat') { S.flat = on; applyLook(); }
-      if (id === 'o-ph') { S.placeholder = on; applyLook(); }
+      if (id === 'o-ph') { S.placeholder = on; applyLook(); renderStats(); }
       if (id === 'o-comp') S.components = on;
       if (id === 'o-tint') S.tint = on;
     });
@@ -934,6 +995,7 @@
       document.documentElement.setAttribute('dir', lang === 'en' ? 'ltr' : 'rtl');
       document.body.className = info.theme === 'dark' ? 'dark' : '';
       var st = info.settings || {};
+      S.size = info.size_info || {};
       S.ratioKey = S.mode === 'file' ? 'import_ratio' : 'simplify_ratio';
       S.ratio = (st[S.ratioKey] || { import_ratio: 100, simplify_ratio: 50 }[S.ratioKey]) / 100;
       S.tolerance = st.import_tolerance || 0.5;

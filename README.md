@@ -7,7 +7,7 @@
 
 ## نصب
 
-1. فایل `dist/banian_browser_v1.2.0.rbz` را دانلود کنید.
+1. فایل `dist/banian_browser_v1.2.1.rbz` را دانلود کنید.
 2. در اسکچ‌آپ این مسیر را باز کنید: **Extensions → Extension Manager → Install Extension**.
 3. فایل rbz را انتخاب کنید.
 4. از منوی **Extensions → Banian Browser** یا نوار ابزار «Banian Browser» پنجره را باز کنید.
@@ -92,6 +92,7 @@
 | **ساده‌سازی داخل مدل** | گروه‌ها و کامپوننت‌های انتخاب‌شده سبک می‌شوند و سلسله‌مراتبشان حفظ می‌شود |
 | **ایمپورت و ساده‌سازی SKP** | فایل skp قبل از قرار گرفتن در مدل سبک می‌شود |
 | **Replace Textures** | متریال فعلی را انتخاب کنید و روی سطحی کلیک کنید: همه سطوح هم‌متریال آن گروه **با حفظ UV** عوض می‌شوند. با `Shift` در کل مدل |
+| **حجم فایل** | قبل از اعمال، حجم مدل فعلی و حجم تخمینی بعد از کاهش (مثلاً ۱۰٪ یا ۵۰٪) نشان داده می‌شود و با حرکت اسلایدر همان لحظه عوض می‌شود. تخمین بر اساس خود مدل شما تنظیم می‌شود (حجم فایل تقسیم بر تعداد سطوح). تکسچرها با کاهش پلیگان کم نمی‌شوند |
 | **تصویر بندانگشتی** | بعد از اولین پیش‌نمایش، تصویر فایل‌های سه‌بعدی در کتابخانه ساخته می‌شود |
 
 پردازش در موتور جاوااسکریپت پنجره انجام می‌شود (three.js و یک الگوریتم QEM اختصاصی)، پس هیچ فایل باینری کامپایل‌شده‌ای ندارد و به نسخه Ruby اسکچ‌آپ وابسته نیست. در تست، ۲۰۰ هزار مثلث حدود ۱ ثانیه طول کشید.
@@ -177,6 +178,7 @@ Banian Browser is an offline library browser for SketchUp 2017–2027, written i
 - 3D preview with units and up axis, and reduction by percentage or error tolerance. UV seams, material borders and open edges are kept.
 - Hierarchy is preserved, and repeated meshes become components. Options: flat shaded, checker UV texture.
 - Simplify groups/components already in the model.
+- Shows the current model size and the estimated size after reduction, live while moving the slider (calibrated on your own model; textures are not reduced).
 - Redraws only on change, streams model geometry in slices, and cancels a running reduction when the settings change.
 - Replace Textures tool: keeps UVs; click affects one group, Shift+click the whole model.
 - Image files (jpg/png/bmp/tif/tga/gif/webp) import as materials. A size in the file name (e.g. `Oak_120x60cm.jpg`) sets the texture size.

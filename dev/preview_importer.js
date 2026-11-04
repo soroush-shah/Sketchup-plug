@@ -35,8 +35,8 @@ const ratio = process.argv[4] ? +process.argv[4] : 1;
         }, 20);
         break;
       }
-      case 'init': if (MODEL) { data = { mode: 'simplify', lang: 'en', theme: 'dark', settings: {}, su: 26 }; break; }
-        data = { mode: 'file', lang: 'fa', theme: 'light', settings: { import_ratio: Math.round(ratio * 100) }, su: 26,
+      case 'init': if (MODEL) { data = { mode: 'simplify', lang: 'fa', theme: 'dark', settings: {}, su: 26, size_info: { model_size: 48 * 1048576, model_faces: 300000, bytes_per_face: 140 } }; break; }
+        data = { mode: 'file', lang: 'fa', theme: 'light', settings: { import_ratio: Math.round(ratio * 100) }, su: 26, size_info: { model_size: 12 * 1048576, bytes_per_face: 150, source_size: fs.statSync(file).size },
         file: { path: file, name: path.basename(file), ext: path.extname(file).slice(1).toLowerCase(), size: fs.statSync(file).size, dir: path.dirname(file) } }; break;
       case 'read': {
         let p = a.path;
@@ -64,6 +64,7 @@ const ratio = process.argv[4] ? +process.argv[4] : 1;
   await page.goto('file://' + path.join(__dirname, '..', 'src', 'banian_browser', 'ui', 'importer.html'));
   await page.waitForFunction(() => window.BI && BI.state && BI.state.entries.length > 0 && document.getElementById('busy').classList.contains('hidden'), null, { timeout: 60000 });
   await page.waitForTimeout(1200);
+  console.error('SIZE:', await page.evaluate(() => document.getElementById('fsize').innerText.replace(/\n/g, ' | ')));
   const name = path.basename(file).replace(/\W/g, '_');
   await page.screenshot({ path: path.join(out, 'imp_' + name + '.png') });
   const stats = await page.evaluate(() => ({ entries: BI.state.entries.length, meshes: BI.state.entries.reduce((s, e) => s + e.meshes.length, 0),

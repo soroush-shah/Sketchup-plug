@@ -128,7 +128,47 @@ module BanianStudio
             info['file'] = { 'path' => p, 'name' => File.basename(p), 'ext' => File.extname(p).delete('.').downcase,
                              'size' => File.size(p), 'dir' => Util.norm(File.dirname(p)) }
           end
+          info['size_info'] = size_info(ctx)
           info
+        end
+
+        # ---- file size estimate --------------------------------------------------------------
+        # SketchUp has no API for "bytes used by this geometry", so the window estimates it:
+        # bytes per face are calibrated on the current saved model (file size minus an
+        # estimate of its texture images, divided by its faces), with a typical value as
+        # fallback. Textures and other data are not affected by polygon reduction.
+        DEFAULT_BYTES_PER_FACE = 150.0
+        def size_info(ctx)
+          path = model.path.to_s
+          msize = !path.empty? && File.file?(path) ? File.size(path) : nil
+          skip = ctx['mode'] == 'skp' ? ctx['definition'] : nil
+          faces = model.entities.grep(Sketchup::Face).length
+          model.definitions.each do |d|
+            next if d.image? || d == skip
+            faces += d.entities.grep(Sketchup::Face).length
+          end
+          tex = texture_bytes(model.materials.to_a)
+          bpf = DEFAULT_BYTES_PER_FACE
+          if msize && faces > 500
+            geom = msize - tex
+            bpf = [[geom.to_f / faces, 60.0].max, 800.0].min if geom > 0
+          end
+          info = { 'model_size' => msize, 'model_faces' => faces, 'bytes_per_face' => bpf.round(1) }
+          info['source_size'] = File.size(ctx['path']) if ctx['path'] && File.file?(ctx['path'])
+          info
+        rescue StandardError => e
+          Util.log_error(e, 'size info')
+          { 'bytes_per_face' => DEFAULT_BYTES_PER_FACE }
+        end
+
+        # Rough size of the images stored in the file (jpg ~0.3, png ~1.2 bytes/pixel).
+        def texture_bytes(mats)
+          mats.inject(0) do |sum, m|
+            t = m.texture
+            next sum unless t
+            per_px = File.extname(t.filename.to_s).downcase == '.png' ? 1.2 : 0.3
+            sum + (t.image_width.to_i * t.image_height.to_i * per_px).round
+          end
         end
 
         def cmd_settings(a)

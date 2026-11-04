@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banian Stretch</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1d2330;
+    --muted: #5d6676;
+    --line: #dde1e7;
+    --accent: #1f74d9;
+    --accent-soft: #e6f0fc;
+    --warn: #d93a2b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 13px/1.5 "Segoe UI", Tahoma, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    padding: 14px 16px 24px;
+  }
+  body[dir="rtl"] { font-family: Tahoma, "Segoe UI", "Geeza Pro", Arial, sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  h1 { font-size: 17px; margin: 0; }
+  h1 small { font-weight: normal; color: var(--muted); font-size: 12px; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .lang button { border: 0; background: var(--panel); padding: 4px 10px; cursor: pointer; font: inherit; color: var(--muted); }
+  .lang button.on { background: var(--accent); color: #fff; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  h2 { font-size: 13px; margin: 0 0 8px; text-transform: none; color: var(--muted); font-weight: 600; }
+  .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tool { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--line);
+          border-radius: 6px; background: var(--panel); cursor: pointer; font: inherit; color: var(--text); text-align: center; }
+  .tool:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .tool img { width: 28px; height: 28px; }
+  label.row { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; cursor: pointer; }
+  label.row input { margin-top: 3px; }
+  label.row img { width: 20px; height: 20px; flex: none; }
+  .row .t { font-weight: 600; }
+  .row .d { color: var(--muted); font-size: 12px; }
+  .height { display: flex; gap: 8px; align-items: center; }
+  .height input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px; font: inherit; direction: ltr; }
+  .height button { padding: 5px 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 5px; cursor: pointer; font: inherit; }
+  .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .warn { color: var(--warn); }
+  details { border-top: 1px solid var(--line); padding: 6px 0; }
+  details:first-of-type { border-top: 0; }
+  summary { cursor: pointer; font-weight: 600; padding: 2px 0; }
+  details ol, details ul { margin: 6px 0; padding-inline-start: 20px; }
+  details li { margin: 2px 0; }
+  kbd { display: inline-block; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px;
+        font: 11px/1.6 Consolas, Menlo, monospace; background: var(--bg); direction: ltr; }
+  [data-lang] { display: none; }
+  body.en [data-lang="en"], body.fa [data-lang="fa"] { display: revert; }
+  footer { color: var(--muted); font-size: 11px; text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body class="en">
+<header>
+  <h1>Banian Stretch <small id="version"></small></h1>
+  <div class="lang" role="group" aria-label="Language">
+    <button type="button" data-set-lang="en">English</button>
+    <button type="button" data-set-lang="fa">فارسی</button>
+  </div>
+</header>
+
+<section>
+  <h2><span data-lang="en">Tools</span><span data-lang="fa">ابزارها</span></h2>
+  <div class="tools">
+    <button class="tool" type="button" data-tool="select" title="Stretch (Window / Click)">
+      <img src="../icons/stretch_select.svg" alt="">
+      <span data-lang="en">Window / Click</span><span data-lang="fa">کادر / کلیک</span>
+    </button>
+    <button class="tool" type="button" data-tool="box" title="Stretch by Box Bounds">
+      <img src="../icons/stretch_box.svg" alt="">
+      <span data-lang="en">Box Bounds</span><span data-lang="fa">جعبه (Box)</span>
+    </button>
+    <button class="tool" type="button" data-tool="face" title="Stretch by Face Bounds">
+      <img src="../icons/stretch_face.svg" alt="">
+      <span data-lang="en">Face Bounds</span><span data-lang="fa">وجه (Face)</span>
+    </button>
+  </div>
+</section>
+
+<section>
+  <h2><span data-lang="en">Selection filters</span><span data-lang="fa">فیلترهای انتخاب</span></h2>
+  <label class="row">
+    <input type="checkbox" data-key="filter_instances"><img src="../icons/filter_instances.svg" alt="">
+    <span><span class="t" data-lang="en">Groups &amp; Components</span><span class="t" data-lang="fa">گروه و کامپوننت</span><br>
+    <span class="d" data-lang="en">Objects completely inside the selection move as a whole, without being deformed.</span>
+    <span class="d" data-lang="fa">گروه‌ها و کامپوننت‌هایی که کامل داخل محدوده‌اند، بدون تغییر شکل جابه‌جا می‌شوند.</span></span>
+  </label>
+  <label class="row">
+    <input type="checkbox" data-key="filter_faces"><img src="../icons/filter_faces.svg" alt="">
+    <span><span class="t" data-lang="en">Faces</span><span class="t" data-lang="fa">وجه‌ها</span><br>
+    <span class="d" data-lang="en">Faces whose vertices are all inside the selection.</span>
+    <span class="d" data-lang="fa">وجه‌هایی که همه‌ی رأس‌هایشان داخل محدوده است.</span></span>
+  </label>
+  <label class="row">
+    <input type="checkbox" data-key="filter_edges"><img src="../icons/filter_edges.svg" alt="">
+    <span><span class="t" data-lang="en">Edges</span><span class="t" data-lang="fa">لبه‌ها</span><br>
+    <span class="d" data-lang="en">Edges with both ends inside the selection.</span>
+    <span class="d" data-lang="fa">لبه‌هایی که هر دو سرشان داخل محدوده است.</span></span>
+  </label>
+  <label class="row">
+    <input type="checkbox" data-key="filter_vertices"><img src="../icons/filter_vertices.svg" alt="">
+    <span><span class="t" data-lang="en">Vertices</span><span class="t" data-lang="fa">رأس‌ها</span><br>
+    <span class="d" data-lang="en">Every vertex inside the selection (the most inclusive option).</span>
+    <span class="d" data-lang="fa">هر رأسی که داخل محدوده باشد (فراگیرترین حالت).</span></span>
+  </label>
+</section>
+
+<section>
+  <h2><span data-lang="en">Components</span><span data-lang="fa">کامپوننت‌ها</span></h2>
+  <label class="row">
+    <input type="checkbox" data-key="make_unique"><img src="../icons/make_unique.svg" alt="">
+    <span><span class="t">Make Unique</span><br>
+    <span class="d" data-lang="en">On: shared components that would be edited get their own definition, so other copies stay unchanged.
+      Off: they are drawn <b class="warn">red</b> and every copy changes. Groups are always made unique, like in SketchUp.</span>
+    <span class="d" data-lang="fa">روشن: کامپوننت‌های مشترکی که ویرایش می‌شوند تعریف مستقل می‌گیرند و بقیه‌ی نسخه‌ها دست نمی‌خورند.
+      خاموش: این کامپوننت‌ها <b class="warn">قرمز</b> نمایش داده می‌شوند و همه‌ی نسخه‌ها تغییر می‌کنند. گروه‌ها مثل خود اسکچ‌آپ همیشه مستقل می‌شوند.</span></span>
+  </label>
+</section>
+
+<section>
+  <h2><span data-lang="en">Bound Height (Face Bounds)</span><span data-lang="fa">ارتفاع محدوده (Face Bounds)</span></h2>
+  <form class="height" id="height-form">
+    <input id="height" type="text" autocomplete="off" spellcheck="false">
+    <button type="submit"><span data-lang="en">Apply</span><span data-lang="fa">اعمال</span></button>
+  </form>
+  <p class="note" data-lang="en">How far the box reaches beyond the clicked face. You can also type it in the Measurements box while the tool is active.</p>
+  <p class="note" data-lang="fa">فاصله‌ای که جعبه از وجه انتخاب‌شده جلوتر می‌رود. هنگام کار با ابزار هم می‌توانید آن را در کادر اندازه (Measurements) تایپ کنید.</p>
+</section>
+
+<section>
+  <h2><span data-lang="en">How to use</span><span data-lang="fa">راهنمای استفاده</span></h2>
+
+  <div data-lang="en">
+    <details open>
+      <summary>Stretch (Window / Click)</summary>
+      <ol>
+        <li>Drag a window over the part of the model to stretch. Everything inside it is selected, at any depth of groups and components.</li>
+        <li>Or simply click an edge or face: it is selected and the stretch starts from the clicked point.</li>
+        <li>Click the start point, then the end point &mdash; or type a distance and press <kbd>Enter</kbd>.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>Stretch by Box Bounds</summary>
+      <ol>
+        <li>Click two corners of a rectangle (on a face, or on the ground). <kbd>Tab</kbd> switches to a rotated rectangle drawn with three clicks.</li>
+        <li>Move to set the Bound Height &mdash; the box reaches that far in front of and behind the rectangle &mdash; and click, or type it.</li>
+        <li>Click the start and end points of the stretch.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>Stretch by Face Bounds</summary>
+      <ol>
+        <li>Hover a face to preview the box, type a length to change the Bound Height.</li>
+        <li>Click the face, then the start and end points of the stretch.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>Keys</summary>
+      <ul>
+        <li><kbd class="addkey">Ctrl</kbd> + click / drag &mdash; add to the selection</li>
+        <li><kbd>Shift</kbd> + click / drag &mdash; remove from the selection</li>
+        <li><kbd>&rarr;</kbd> <kbd>&larr;</kbd> <kbd>&uarr;</kbd> &mdash; lock the stretch to the red / green / blue axis, <kbd>&darr;</kbd> unlocks</li>
+        <li><kbd>Shift</kbd> (hold while stretching) &mdash; lock the current inference</li>
+        <li>Negative distance &mdash; stretch in the opposite direction</li>
+        <li><kbd>Esc</kbd> &mdash; step back / clear the selection</li>
+        <li>Pre-select objects before starting a tool to limit the stretch to them (green dashed box).</li>
+      </ul>
+    </details>
+  </div>
+
+  <div data-lang="fa" dir="rtl">
+    <details open>
+      <summary>کشش با کادر / کلیک</summary>
+      <ol>
+        <li>روی بخشی از مدل که می‌خواهید کشیده شود کادر بکشید. هرچه داخل کادر باشد، در هر عمقی از گروه‌ها و کامپوننت‌ها، انتخاب می‌شود.</li>
+        <li>یا فقط روی یک لبه یا وجه کلیک کنید. همان انتخاب می‌شود و کشش از نقطه‌ی کلیک شروع می‌شود.</li>
+        <li>نقطه‌ی شروع و بعد نقطه‌ی پایان را کلیک کنید، یا فاصله را تایپ کنید و <kbd>Enter</kbd> بزنید.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>کشش با جعبه (Box Bounds)</summary>
+      <ol>
+        <li>دو گوشه‌ی یک مستطیل را کلیک کنید (روی یک وجه یا روی زمین). با <kbd>Tab</kbd> مستطیل چرخیده با سه کلیک کشیده می‌شود.</li>
+        <li>ماوس را حرکت دهید تا ارتفاع محدوده مشخص شود (جعبه به همین اندازه جلو و پشت مستطیل می‌رود) و کلیک کنید، یا عدد را تایپ کنید.</li>
+        <li>نقطه‌ی شروع و پایان کشش را کلیک کنید.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>کشش با وجه (Face Bounds)</summary>
+      <ol>
+        <li>ماوس را روی یک وجه ببرید تا جعبه‌ی پیش‌نمایش را ببینید. برای تغییر ارتفاع محدوده یک عدد تایپ کنید.</li>
+        <li>روی وجه کلیک کنید، بعد نقطه‌ی شروع و پایان کشش را بزنید.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>کلیدها</summary>
+      <ul>
+        <li><kbd class="addkey">Ctrl</kbd> + کلیک / کادر: اضافه کردن به انتخاب</li>
+        <li><kbd>Shift</kbd> + کلیک / کادر: کم کردن از انتخاب</li>
+        <li><kbd>&rarr;</kbd> <kbd>&larr;</kbd> <kbd>&uarr;</kbd>: قفل کشش روی محور قرمز / سبز / آبی؛ <kbd>&darr;</kbd> قفل را برمی‌دارد</li>
+        <li>نگه داشتن <kbd>Shift</kbd> حین کشش: قفل کردن جهت فعلی (inference)</li>
+        <li>عدد منفی: کشش در جهت مخالف</li>
+        <li><kbd>Esc</kbd>: یک مرحله به عقب / پاک کردن انتخاب</li>
+        <li>اگر قبل از فعال کردن ابزار چیزی را انتخاب کنید، کشش فقط روی همان‌ها اثر می‌گذارد (کادر خط‌چین سبز).</li>
+      </ul>
+    </details>
+  </div>
+</section>
+
+<p class="note" data-lang="en">Menu labels switch language the next time SketchUp starts. Toolbar tooltips are always in English.</p>
+<p class="note" data-lang="fa" dir="rtl">زبان منوها از دفعه‌ی بعد که اسکچ‌آپ باز شود عوض می‌شود. توضیح آیکون‌های تولبار همیشه انگلیسی است.</p>
+
+<footer>Banian Studio</footer>
+
+<script>
+(function () {
+  'use strict';
+  var su = window.sketchup || {};
+  function call(name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (typeof su[name] === 'function') { su[name].apply(su, args); }
+  }
+
+  function setLanguage(lang) {
+    document.body.className = lang;
+    document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-set-lang') === lang);
+    });
+  }
+
+  window.BS = {
+    setState: function (state) {
+      setLanguage(state.language);
+      document.querySelectorAll('input[data-key]').forEach(function (input) {
+        input.checked = !!state[input.getAttribute('data-key')];
+      });
+      var height = document.getElementById('height');
+      if (document.activeElement !== height) { height.value = state.bound_height_text; }
+      document.getElementById('version').textContent = 'v' + state.version;
+      if (state.mac) {
+        document.querySelectorAll('.addkey').forEach(function (k) { k.textContent = 'Option'; });
+      }
+    }
+  };
+
+  document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var lang = b.getAttribute('data-set-lang');
+      setLanguage(lang);
+      call('setLanguage', lang);
+    });
+  });
+  document.querySelectorAll('input[data-key]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      call('setBool', input.getAttribute('data-key'), input.checked);
+    });
+  });
+  document.querySelectorAll('[data-tool]').forEach(function (b) {
+    b.addEventListener('click', function () { call('activateTool', b.getAttribute('data-tool')); });
+  });
+  document.getElementById('height-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var height = document.getElementById('height');
+    call('setBoundHeight', height.value);
+    height.blur();
+  });
+
+  call('ready');
+}());
+</script>
+</body>
+</html>

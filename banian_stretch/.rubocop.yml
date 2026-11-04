@@ -1,0 +1,15 @@
+plugins: rubocop-sketchup
+
+AllCops:
+  DisplayCopNames: true
+  SketchUp:
+    SourcePath: src
+    TargetSketchUpVersion: 2021
+    Exclude:
+      - tests/**/*
+      - tools/**/*
+  TargetRubyVersion: 2.7
+  NewCops: disable
+  Exclude:
+    - tests/**/*
+    - tools/**/*

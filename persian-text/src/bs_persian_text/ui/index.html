@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>متن فارسی</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">
+      <strong id="modeTitle">متن فارسی جدید</strong>
+      <span id="backend" class="badge">در حال آماده‌سازی…</span>
+    </div>
+    <div class="header-actions">
+      <button id="btnPick" class="ghost" title="متن فارسیِ انتخاب‌شده در مدل را برای ویرایش باز کن">ویرایش متنِ انتخاب‌شده</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="controls">
+      <!-- Text -->
+      <div class="card">
+        <label class="card-title" for="text">متن</label>
+        <textarea id="text" rows="3" dir="auto" placeholder="متن خود را اینجا بنویسید…"></textarea>
+        <div class="row small">
+          <label class="check"><input type="checkbox" id="persianDigits"> تبدیل اعداد به فارسی</label>
+          <label class="inline">جهت:
+            <select id="baseDir">
+              <option value="auto">خودکار</option>
+              <option value="rtl">راست‌به‌چپ</option>
+              <option value="ltr">چپ‌به‌راست</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- Font -->
+      <div class="card">
+        <div class="card-title">فونت</div>
+        <div class="row">
+          <input type="search" id="fontSearch" placeholder="جستجوی فونت…">
+          <label class="check"><input type="checkbox" id="onlyPersian" checked> فقط فونت‌های فارسی</label>
+        </div>
+        <div id="fontList" class="font-list" tabindex="0"></div>
+        <div class="row">
+          <label class="inline grow">سبک:
+            <select id="fontStyle"></select>
+          </label>
+          <button id="btnBrowse" class="ghost" title="یک فایل فونت (ttf/otf) که نصب نیست را انتخاب کنید">فایل فونت…</button>
+          <button id="btnRescan" class="ghost icon" title="بازخوانی فونت‌های نصب‌شده">⟳</button>
+        </div>
+        <div id="axes"></div>
+      </div>
+
+      <!-- Size & layout -->
+      <div class="card">
+        <div class="card-title">اندازه و چیدمان</div>
+        <div class="grid2">
+          <label>ارتفاع
+            <input type="text" id="height" value="30cm" dir="ltr">
+          </label>
+          <label>معیار ارتفاع
+            <select id="heightMode">
+              <option value="em">اندازه‌ی فونت</option>
+              <option value="ink">ارتفاع واقعی کل متن</option>
+            </select>
+          </label>
+          <label>تراز
+            <span class="seg" id="alignSeg">
+              <button data-v="right" title="راست">راست</button><button data-v="center" title="وسط">وسط</button><button data-v="left" title="چپ">چپ</button>
+            </span>
+          </label>
+          <label>فاصله‌ی سطرها <output id="lineSpacingOut"></output>
+            <input type="range" id="lineSpacing" min="0.8" max="3" step="0.05" value="1.6">
+          </label>
+          <label>فاصله‌ی کلمات <output id="wordSpacingOut"></output>
+            <input type="range" id="wordSpacing" min="-20" max="150" step="1" value="0">
+          </label>
+          <label>فاصله‌ی حروف لاتین <output id="letterSpacingOut"></output>
+            <input type="range" id="letterSpacing" min="-10" max="60" step="1" value="0">
+          </label>
+        </div>
+      </div>
+
+      <!-- Style -->
+      <div class="card">
+        <div class="card-title">ظاهر</div>
+        <div class="grid2">
+          <label>ضخیم/نازک‌کردن <output id="boldOut"></output>
+            <input type="range" id="bold" min="-4" max="10" step="0.25" value="0">
+          </label>
+          <label>کج (ایتالیک) <output id="slantOut"></output>
+            <input type="range" id="slant" min="-25" max="25" step="1" value="0">
+          </label>
+          <label>شعاع قوس (۰ = صاف)
+            <input type="text" id="arc" value="0" dir="ltr" title="عدد مثبت: قوس رو به بالا، منفی: رو به پایین">
+          </label>
+          <label>کیفیت منحنی‌ها
+            <select id="quality">
+              <option value="low">کم (سبک)</option>
+              <option value="medium" selected>متوسط</option>
+              <option value="high">زیاد</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- 3D -->
+      <div class="card">
+        <div class="card-title">سه‌بعدی و متریال</div>
+        <div class="grid2">
+          <label>نوع
+            <span class="seg" id="filledSeg">
+              <button data-v="1">سطح پر</button><button data-v="0">فقط خط دور</button>
+            </span>
+          </label>
+          <label>ضخامت اکسترود (۰ = تخت)
+            <input type="text" id="extrude" value="0" dir="ltr">
+          </label>
+          <label>فاصله از سطح
+            <input type="text" id="zOffset" value="0" dir="ltr" title="برای جلوگیری از تداخل با سطحی که متن روی آن چسبیده">
+          </label>
+          <label>متریال
+            <span class="row tight">
+              <select id="material" class="grow"></select>
+              <input type="color" id="color" value="#1f3a5f" title="ساخت متریال با این رنگ">
+            </span>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="smooth" checked> نرم‌کردن لبه‌های کناری (برای متن اکسترودشده)</label>
+      </div>
+    </section>
+
+    <section class="preview-pane">
+      <div class="preview-head">
+        <span>پیش‌نمایش</span>
+        <span id="dims" class="muted"></span>
+      </div>
+      <div id="preview" class="preview"><div class="empty">…</div></div>
+      <div id="status" class="status"></div>
+    </section>
+  </main>
+
+  <footer>
+    <label class="check"><input type="checkbox" id="keepOpen"> پنجره باز بماند</label>
+    <label class="check" id="editAllWrap" hidden><input type="checkbox" id="editAll"> اعمال روی همه‌ی کپی‌ها</label>
+    <span class="spacer"></span>
+    <button id="btnCancel" class="ghost">بستن</button>
+    <button id="btnBuild" class="primary" disabled>ساخت و قرار دادن</button>
+  </footer>
+</div>
+
+<script src="lib/clipper.js"></script>
+<script src="lib/opentype.min.js"></script>
+<script src="lib/hb_wasm.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

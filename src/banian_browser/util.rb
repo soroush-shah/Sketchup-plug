@@ -1,6 +1,9 @@
 module BanianStudio
   module BanianBrowser
     # Small helpers shared by every module. Written for Ruby 2.2+ (SketchUp 2017+).
+    # A string that already is JSON (sent to the dialog as is).
+    class RawJSON < String; end
+
     module Util
       MODEL_EXTS = %w[.skp].freeze
       MATERIAL_EXTS = %w[.skm].freeze

@@ -60,6 +60,7 @@
   var picked = { name: 'Oak Natural', display: 'Oak Natural', color: '#c8a27a', alpha: 1, texture: true, width: 120, height: 60, pixels: [2048, 1024], thumb: thumb('x.skm', 0) };
   var cmds = {
     init: function () { return { settings: settings, version: '1.0.0', su: 26, su_year: 2026, platform: 'win', data_dir: 'C:/Users/me/AppData/Local/BanianBrowser', picked: picked }; },
+    page: function () { return true; },
     indexes: function () { setTimeout(function () { BB.emit('index', models); BB.emit('index', mats); }, 300); return [models, mats]; },
     thumbs: function (a) { setTimeout(function () { var o = {}; a.paths.forEach(function (p, i) { o[p] = /Fridge|Hood/.test(p) ? null : thumb(p, p.length + i); }); BB.emit('thumbs', o); }, 80); return true; },
     settings: function (a) { Object.keys(a.values).forEach(function (k) { settings[k] = a.values[k]; }); return settings; },

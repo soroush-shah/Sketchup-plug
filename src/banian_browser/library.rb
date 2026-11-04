@@ -4,7 +4,9 @@ module BanianStudio
     # cached index files and file operations.
     module Library
       SKIP_DIRS = %w[__macosx .git .svn $recycle.bin thumbs .thumbs @eadir].freeze
-      SLICE = 0.05
+      # Work in short slices with long pauses so SketchUp stays smooth while scanning.
+      SLICE = 0.015
+      INTERVAL = 0.06
 
       class << self
         def roots
@@ -62,30 +64,56 @@ module BanianStudio
           roots.map { |r| cached_index(r['path']) || { 'root' => r['path'], 'folders' => [], 'items' => [], 'pending' => true } }
         end
 
+        # Same as all_cached, but as a JSON string built from the index files without
+        # parsing them (opening the browser with a big library stays instant).
+        def all_cached_json
+          parts = roots.map do |r|
+            f = index_file(r['path'])
+            txt = begin
+              File.file?(f) ? File.read(f, :encoding => 'UTF-8') : nil
+            rescue StandardError
+              nil
+            end
+            txt && txt.start_with?('{') ? txt : JSON.generate('root' => r['path'], 'folders' => [], 'items' => [], 'pending' => true)
+          end
+          RawJSON.new('[' + parts.join(',') + ']')
+        end
+
         def scanning?(root)
           @scanners && @scanners[Util.norm(root)]
         end
 
         # Asynchronous, chunked scan. Pushes the result to the dialog when done.
-        def scan(root)
+        # Incremental by default: folders whose modification time did not change are
+        # taken from the cached index without listing or touching their files.
+        # full = true re-reads everything (Rescan button).
+        def scan(root, full = false)
           root = Util.norm(root)
           @scanners ||= {}
           return if @scanners[root]
-          @scanners[root] = Scanner.new(root) do |index|
+          old = full ? nil : cached_index(root)
+          @scanners[root] = Scanner.new(root, old) do |index|
             @scanners.delete(root)
-            begin
-              File.open(index_file(root), 'wb') { |f| f.write(JSON.generate(index)) }
-            rescue StandardError => e
-              Util.log_error(e, 'index write')
+            same = old && old['folders'] == index['folders'] && old['items'] == index['items'] &&
+                   old['exists'] == index['exists']
+            if same
+              # nothing changed on disk: no rewrite, no re-render in the browser
+              Dialog.emit('index_same', 'root' => root)
+            else
+              begin
+                File.open(index_file(root), 'wb') { |f| f.write(JSON.generate(index)) }
+              rescue StandardError => e
+                Util.log_error(e, 'index write')
+              end
+              Dialog.emit('index', index)
             end
-            Dialog.emit('index', index)
           end
           Dialog.emit('scanning', 'root' => root)
           @scanners[root].start
         end
 
-        def scan_all
-          roots.each { |r| scan(r['path']) }
+        def scan_all(full = false)
+          roots.each { |r| scan(r['path'], full) }
         end
 
         # ---- file operations (all paths UTF-8, forward slashes) --------------------
@@ -171,16 +199,32 @@ module BanianStudio
 
       # Walks a folder tree a few milliseconds at a time (keeps SketchUp responsive).
       class Scanner
-        def initialize(root, &done)
+        def initialize(root, old = nil, &done)
           @root = root
           @done = done
+          @old_dirs = {}
+          @old_kids = {}
+          @old_items = {}
+          @old_by_path = {}
+          return unless old && old['folders']
+          @old_root_t = old['t']
+          old['folders'].each do |f|
+            @old_dirs[f['p']] = f
+            (@old_kids[f['d']] ||= []) << f
+          end
+          (old['items'] || []).each do |it|
+            (@old_items[it['f']] ||= []) << it
+            @old_by_path[it['p']] = it
+          end
         end
 
         def start
           @stack = [@root]
           @folders = []
+          @entry = {}
           @items = []
-          @timer = UI.start_timer(0.01, true) { tick }
+          @root_t = nil
+          @timer = UI.start_timer(INTERVAL, true) { tick }
         end
 
         def tick
@@ -204,6 +248,7 @@ module BanianStudio
           @timer = nil
           index = {
             'root' => @root,
+            't' => @root_t,
             'scanned_at' => Time.now.to_i,
             'exists' => File.directory?(@root),
             'folders' => @folders,
@@ -222,15 +267,48 @@ module BanianStudio
           end
         end
 
+        def mtime(dir)
+          File.mtime(dir).to_i
+        rescue StandardError
+          nil
+        end
+
         def scan_dir(dir)
+          t = mtime(dir)
+          return unless t
+          old_t = dir == @root ? @old_root_t : (@old_dirs[dir] && @old_dirs[dir]['t'])
+          @root_t = t if dir == @root
+          i = @entry[dir]
+          @folders[i] = @folders[i].merge('t' => t) if i && @folders[i]['t'] != t
+          if old_t && old_t == t
+            reuse_dir(dir)
+          else
+            read_dir(dir)
+          end
+        end
+
+        # Unchanged folder: same entries as last time (adding, removing or renaming a
+        # file changes the folder's modification time).
+        def reuse_dir(dir)
+          (@old_kids[dir] || []).each { |f| add_folder(f) }
+          @items.concat(@old_items[dir] || [])
+        end
+
+        def add_folder(f)
+          @entry[f['p']] = @folders.length
+          @folders << f
+          @stack.push(f['p'])
+        end
+
+        def read_dir(dir)
           names = list(dir).map { |n| Util.utf8(n) }.reject { |n| n == '.' || n == '..' || n.start_with?('.') }
           files = []
           names.sort_by(&:downcase).each do |n|
             full = "#{dir}/#{n}"
             if File.directory?(full)
               next if SKIP_DIRS.include?(n.downcase)
-              @folders << { 'p' => full, 'n' => n, 'd' => dir }
-              @stack.push(full)
+              # 't' is filled in when the folder itself is read or reused
+              add_folder('p' => full, 'n' => n, 'd' => dir, 't' => (@old_dirs[full] || {})['t'])
             else
               files << n
             end
@@ -262,7 +340,11 @@ module BanianStudio
               's' => st.size,
               'm' => st.mtime.to_i
             }
-            item['v'] = Util.skp_version(full) if kind == 'model'
+            if kind == 'model'
+              prev = @old_by_path[full]
+              # reading the version needs the file header: only when the file changed
+              item['v'] = prev && prev['s'] == item['s'] && prev['m'] == item['m'] ? prev['v'] : Util.skp_version(full)
+            end
             @items << item
           end
         end

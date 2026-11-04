@@ -124,6 +124,36 @@ check('skm thumbnail extracted', u2 && File.binread(BB::Thumbnails.cache_file(sk
 check('sidecar used as thumbnail', BB::Thumbnails.resolve(File.join(lib, 'Furniture', 'Table.skp')).end_with?('Table.jpg?v=' + File.mtime(File.join(lib, 'Furniture', 'Table.jpg')).to_i.to_s))
 check('image is its own thumbnail', BB::Thumbnails.resolve(File.join(lib, 'Materials', 'Wood', 'Oak.jpg')).include?('Oak.jpg'))
 
+# incremental rescan: unchanged folders are not read again
+old = Time.now - 3600
+Dir.glob(File.join(lib, '**', '*')).select { |d| File.directory?(d) }.push(lib).each { |d| File.utime(old, old, d) }
+BB::Library.scan(lib, true)
+UI.run_timers
+BB::Dialog.events.clear
+reads = 0
+BB::Util.singleton_class.send(:alias_method, :orig_skp_version, :skp_version)
+BB::Util.define_singleton_method(:skp_version) { |p| reads += 1; orig_skp_version(p) }
+BB::Library.scan(lib)
+UI.run_timers
+check('unchanged library: no re-render, no file reads', BB::Dialog.events.map(&:first) == %w[scanning index_same] && reads.zero?)
+File.binwrite(File.join(lib, 'Furniture', 'Chairs', 'New Chair.skp'), header)
+BB::Dialog.events.clear
+BB::Library.scan(lib)
+UI.run_timers
+ev2 = BB::Dialog.events.find { |e, _| e == 'index' }
+check('new file found by incremental scan', ev2 && ev2[1]['items'].any? { |i| i['n'] == 'New Chair' } && ev2[1]['items'].length == 6)
+check('only the changed file header read', reads == 1)
+BB::Dialog.events.clear
+BB::Library.scan(lib)
+UI.run_timers
+check('after the change it is stable again', BB::Dialog.events.map(&:first) == %w[scanning index_same])
+File.delete(File.join(lib, 'Furniture', 'Chairs', 'New Chair.skp'))
+BB::Library.scan(lib, true)
+UI.run_timers
+
+raw = BB::Library.all_cached_json
+check('cached indexes sent as raw JSON', raw.is_a?(BB::RawJSON) && JSON.parse(raw).first['items'].length == 5)
+
 # file operations
 r = BB::Library.rename(skp, 'Chair Renamed')
 UI.run_timers

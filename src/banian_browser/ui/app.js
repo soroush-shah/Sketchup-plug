@@ -388,6 +388,7 @@
     if (v !== S.view) S.search = '';
     S.view = v;
     store('view', v);
+    call('page', { page: v });
     S.replaceArmed = S.replaceArmed && (v === 'materials' || v === 'inmodel' || v === 'favorites' || v === 'recent');
     renderAll();
     if (v === 'inmodel') loadModelMats();
@@ -774,7 +775,7 @@
     var m = tt.mat, sw = '<div class="sw" style="' + swatchStyle(m) + '"></div>', txt, warn = false;
     if (tt.mode === 'selection') {
       if (!tt.faces) { txt = esc(t('tt_sel_none')); warn = true; }
-      else txt = '<b>' + esc(t('tt_sel').replace('%n', tt.faces)) + '</b>' + (tt.mats > 1 ? ' · ' + esc(t('tt_sel_mats').replace('%n', tt.mats)) : (m ? '<br>' + esc(m.display) : ''));
+      else txt = '<b>' + esc(t('tt_sel').replace('%n', tt.faces + (tt.more ? '+' : ''))) + '</b>' + (tt.mats > 1 ? ' · ' + esc(t('tt_sel_mats').replace('%n', tt.mats)) : (m ? '<br>' + esc(m.display) : ''));
     } else if (!m) { txt = esc(t('tt_none')); warn = true; }
     else if (!tt.textured) { txt = esc(t('tt_no_tex')) + '<br><b>' + esc(m.display) + '</b>'; warn = true; }
     else txt = esc(t('tt_mat')) + '<br><b>' + esc(m.display) + '</b>';
@@ -933,7 +934,20 @@
       }
       if (S.texTarget && S.texTarget.mode === 'material') loadTarget();
     }
-    if (S.view === 'inmodel') loadModelMats();
+    // In Model page: only move the "current" mark; the full list is reloaded on demand
+    if (S.view === 'inmodel' && p) {
+      S.modelMats.forEach(function (m) { m.current = m.name === p.name; });
+      var grid = $('content');
+      Array.prototype.forEach.call(grid.querySelectorAll('.card.mm'), function (el) {
+        var m = S.mmList && S.mmList[+el.getAttribute('data-mm')];
+        if (m) el.classList.toggle('cur', m.name === p.name);
+      });
+    }
+  });
+  BB.on('index_same', function (d) {
+    delete S.scanning[d.root];
+    renderTree();
+    renderStatus();
   });
   BB.on('index', function (idx) {
     S.indexes[idx.root] = idx;
@@ -1390,7 +1404,7 @@
       case 'add-root': addRoot(el.getAttribute('data-type') || (S.view === 'materials' ? 'materials' : (S.view === 'models' ? 'models' : 'both'))); break;
       case 'rescan':
         S.roots.forEach(function (r) { S.scanning[r.path] = true; });
-        call('indexes', { rescan: true });
+        call('indexes', { rescan: true, full: true });
         renderTree(); renderStatus();
         break;
       case 'toggle-side':
@@ -1560,12 +1574,20 @@
       S.view = load('view', 'models');
       rebuild();
       renderAll();
-      return call('indexes', { rescan: true }).then(function (list) {
+      call('page', { page: S.view });
+      // show the cached library at once; check the folders for changes a little later,
+      // in the background (only changed folders are read again)
+      return call('indexes').then(function (list) {
         (list || []).forEach(function (idx) { if (!idx.pending) S.indexes[idx.root] = idx; });
-        (S.settings.roots || []).forEach(function (r) { S.scanning[r.path] = true; });
+        var missing = (S.settings.roots || []).filter(function (r) { return !S.indexes[r.path]; });
         rebuild();
         renderAll();
         if (S.view === 'inmodel') loadModelMats();
+        setTimeout(function () {
+          (S.settings.roots || []).forEach(function (r) { S.scanning[r.path] = true; });
+          call('indexes', { rescan: true });
+          renderTree(); renderStatus();
+        }, missing.length ? 50 : 2500);
       });
     });
   }

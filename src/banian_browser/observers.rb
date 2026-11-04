@@ -69,10 +69,11 @@ module BanianStudio
 
         # Coalesces bursts of events (a selection change fires many) into one update.
         def later(what)
+          return unless Dialog.visible?
           @due ||= {}
           @due[what] = true
           return if @timer
-          @timer = UI.start_timer(0.15, false) do
+          @timer = UI.start_timer(0.25, false) do
             @timer = nil
             due = @due
             @due = {}
@@ -83,7 +84,8 @@ module BanianStudio
         def flush(due)
           return unless Dialog.visible?
           Dialog.emit('picked', MaterialOps.info(MaterialOps.current)) if due[:picked]
-          Dialog.emit('tex_target', TextureTools.summary) if due[:target]
+          # the selection summary is only worth computing while the Tools page is open
+          Dialog.emit('tex_target', TextureTools.summary) if due[:target] && Dialog.page == 'tools'
         rescue StandardError => e
           Util.log_error(e, 'observers')
         end

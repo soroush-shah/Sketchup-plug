@@ -7,19 +7,22 @@ module BanianStudio
     # With nothing selected it works on every face painted with the material chosen in
     # SketchUp (paint bucket / Materials panel).
     module TextureTools
+      SUMMARY_LIMIT = 3000
+
       class << self
         def model
           Sketchup.active_model
         end
 
         # [[face, front?], ...] for every textured face that can be positioned.
-        def targets
+        # limit: stop collecting after this many faces (for the quick summary).
+        def targets(limit = nil)
           include_groups = Settings['tex_include_groups']
           out = []
           seen = {}
           visit = nil
           visit = lambda do |e, inherited, depth|
-            return if depth > 12
+            return if depth > 12 || (limit && out.length >= limit)
             if e.is_a?(Sketchup::Face)
               return if seen[e]
               seen[e] = true
@@ -80,9 +83,10 @@ module BanianStudio
             m = MaterialOps.current
             return { 'mode' => 'material', 'mat' => MaterialOps.info(m), 'textured' => !!(m && m.texture) }
           end
-          list = targets
+          list = targets(SUMMARY_LIMIT)
           mats = list.map { |f, front, bake| bake || (front ? f.material : f.back_material) }.compact.uniq
-          { 'mode' => 'selection', 'faces' => list.length, 'mats' => mats.length, 'mat' => MaterialOps.info(mats.first) }
+          { 'mode' => 'selection', 'faces' => list.length, 'more' => list.length >= SUMMARY_LIMIT,
+            'mats' => mats.length, 'mat' => MaterialOps.info(mats.first) }
         end
 
         def run(name)

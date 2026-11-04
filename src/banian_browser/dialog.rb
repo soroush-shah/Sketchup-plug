@@ -13,6 +13,9 @@ module BanianStudio
           @dlg && @dlg.visible?
         end
 
+        # Page shown in the browser (models, materials, tools...), reported by the UI.
+        attr_accessor :page
+
         def show
           if visible?
             @dlg.bring_to_front
@@ -67,6 +70,10 @@ module BanianStudio
         end
 
         def reply(id, data)
+          if data['data'].is_a?(RawJSON)
+            raw = data['data'].gsub("\u2028", '\\u2028').gsub("\u2029", '\\u2029')
+            return js("window.BB && BB.reply(#{to_js(id)}, {\"ok\":true,\"data\":#{raw}});")
+          end
           js("window.BB && BB.reply(#{to_js(id)}, #{to_js(data)});")
         end
 
@@ -150,12 +157,12 @@ module BanianStudio
 
         # ---- library -------------------------------------------------------------------
         def cmd_indexes(a)
-          Library.scan_all if a['rescan']
-          Library.all_cached
+          Library.scan_all(a['full'] ? true : false) if a['rescan']
+          Library.all_cached_json
         end
 
         def cmd_scan(a)
-          Library.scan(a['root'])
+          Library.scan(a['root'], true)
           true
         end
 
@@ -308,6 +315,11 @@ module BanianStudio
 
         def cmd_tex_target(_a)
           TextureTools.summary
+        end
+
+        def cmd_page(a)
+          Dialog.page = a['page'].to_s
+          true
         end
 
         def cmd_model_mats(_a)

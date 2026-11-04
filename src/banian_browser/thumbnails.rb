@@ -9,9 +9,12 @@ module BanianStudio
     module Thumbnails
       PNG_SIG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack('C*')
       PNG_END = 'IEND'.b + [0xAE, 0x42, 0x60, 0x82].pack('C*')
-      CHUNK = 1 << 20
-      MAX_SCAN = 64 << 20
-      SLICE = 0.06
+      CHUNK = 512 << 10
+      # The preview sits near the start of a .skp; never read deep into big files.
+      MAX_SCAN = 6 << 20
+      # Short work slices with pauses between them keep SketchUp responsive.
+      SLICE = 0.02
+      INTERVAL = 0.05
 
       class << self
         def cache_dir
@@ -90,7 +93,7 @@ module BanianStudio
 
         def start_timer
           return if @timer
-          @timer = UI.start_timer(0.01, true) { tick }
+          @timer = UI.start_timer(INTERVAL, true) { tick }
         end
 
         def tick
@@ -207,7 +210,7 @@ module BanianStudio
                   more = f.read(CHUNK)
                   return false unless more
                   buf << more
-                  return false if buf.bytesize - i > (12 << 20)
+                  return false if buf.bytesize - i > (4 << 20)
                 end
               end
               buf = buf.bytesize > 16 ? buf[-16..-1] : buf

@@ -232,6 +232,40 @@ class ToolsTest < Minitest::Test
     Settings['language'] = 'en'
   end
 
+  def test_selection_is_drawn_on_top_in_2d
+    tool = use(SelectTool.new)
+    drag(tool, [60, -60], [200, 10])
+    before = @view.draw2d_calls || 0
+    tool.draw(@view)
+    assert_operator @view.draw2d_calls, :>, before
+  end
+
+  def test_empty_window_explains_why
+    tool = use(SelectTool.new)
+    drag(tool, [20, -60], [80, 10]) # crosses the middle only, no vertex inside
+    assert tool.instance_variable_get(:@plan).empty?
+    assert_match(/Nothing was caught/, Sketchup.status_text)
+  end
+
+  def test_errors_in_callbacks_are_reported_not_raised
+    tool = use(SelectTool.new)
+    tool.define_singleton_method(:select_window) { |*_a| raise 'boom' }
+    UI.messages.clear
+    drag(tool, [60, -60], [200, 10])
+    assert_equal 1, UI.messages.size
+    assert_match(/boom/, UI.messages.first)
+    assert_match(/SelectTool#onLButtonUp/, UI.messages.first)
+    drag(tool, [60, -60], [200, 10]) # same error again: no second message box
+    assert_equal 1, UI.messages.size
+    assert_equal :select, tool.instance_variable_get(:@state)
+  end
+
+  def test_diagnostics_command
+    UI.messages.clear
+    UI::Command.all.find { |c| c.label.start_with?('Diagnostics') }.invoke
+    assert_match(/Banian Stretch .*SketchUp/m, UI.messages.last)
+  end
+
   def test_status_texts_are_english
     [SelectTool, BoxTool, FaceTool].each do |klass|
       use(klass.new)

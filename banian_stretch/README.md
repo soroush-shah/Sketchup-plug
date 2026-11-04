@@ -49,10 +49,17 @@ Whatever is inside the selection moves. Whatever is outside stays put. Parts tha
 
 ### نصب
 
-1. فایل `dist/banian_stretch_v1.0.0.rbz` را دانلود کنید.
+1. فایل `dist/banian_stretch_v1.0.1.rbz` را دانلود کنید.
 2. در اسکچ‌آپ این مسیر را باز کنید: **Extensions → Extension Manager → Install Extension**.
 3. فایل را انتخاب کنید.
 4. تولبار **Banian Stretch** را از **View → Toolbars** روشن کنید.
+
+### اگر کار نکرد
+
+- اگر خطایی رخ دهد، یک پیام با متن خطا نشان داده می‌شود و جزئیات در یک فایل لاگ ذخیره می‌شود. مسیر فایل داخل همان پیام آمده است.
+- از منوی **Extensions → بانیان استرچ → گزارش مشکل (Diagnostics)** نسخه‌ها، تنظیمات و مسیر لاگ را ببینید و برای ما بفرستید.
+- کادر انتخاب باید **رأس‌ها** (گوشه‌ها و سرهای قطعه) را دربر بگیرد. اگر کادر فقط از وسط یک وجه رد شود، چیزی انتخاب نمی‌شود و پیامی در نوار وضعیت نشان داده می‌شود.
+- اگر تاگل‌های فیلتر خاموش باشند، چیزی انتخاب نمی‌شود.
 
 اکستنشن هنوز امضا (sign) نشده است. اگر اسکچ‌آپ اجازه‌ی نصب نداد، در Extension Manager بخش **Loading Policy** را روی **Approve Unidentified Extensions** بگذارید.
 
@@ -62,7 +69,7 @@ Whatever is inside the selection moves. Whatever is outside stays put. Parts tha
 
 ### Installation
 
-1. Download `dist/banian_stretch_v1.0.0.rbz`.
+1. Download `dist/banian_stretch_v1.0.1.rbz`.
 2. In SketchUp, open **Extensions → Extension Manager → Install Extension** and choose the file.
 3. Turn on the **Banian Stretch** toolbar from **View → Toolbars**.
 

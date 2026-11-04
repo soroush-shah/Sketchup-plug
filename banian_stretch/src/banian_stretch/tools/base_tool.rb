@@ -24,6 +24,11 @@ module Banian
     class BaseTool
       CLICK_TOLERANCE = 4 # pixels before a press becomes a drag
       TAB_KEY = 9
+      # SketchUp callbacks wrapped by ErrorReporter.guard in each tool class.
+      CALLBACKS = %i[
+        activate deactivate resume suspend onCancel onKeyDown onKeyUp onUserText
+        getExtents draw onMouseMove onLButtonDown onLButtonUp
+      ].freeze
       MAC = Sketchup.platform == :platform_osx
       ADD_KEY = MAC ? 'Option' : 'Ctrl'
 
@@ -210,19 +215,21 @@ module Banian
         index = (0...ph.count).find { |i| ph.leaf_at(i) == target }
         return nil unless index
 
-        path = ph.path_at(index).to_a
-        instances = path[0...-1]
+        # The pick path lists the instances down to the leaf (the leaf itself
+        # may or may not be included, so keep only groups/components).
+        instances = ph.path_at(index).to_a.select { |e| Geometry.instance?(e) }
         active = (@model.active_path || []).to_a
         if !active.empty? && instances.first(active.size) == active
           instances = instances.drop(active.size)
         end
-        return nil unless instances.all? { |i| Geometry.instance?(i) && !i.locked? }
+        return nil if instances.any?(&:locked?)
 
         root = instances.first || target
         active_parent = active.empty? ? @model : active.last.definition
         return nil unless root.parent == active_parent
 
-        [instances, target, ph.transformation_at(index)]
+        tr = instances.inject(Geometry.context_transformation(@model)) { |t, i| t * i.transformation }
+        [instances, target, tr]
       end
 
       # --- Move phase --------------------------------------------------------
@@ -379,6 +386,66 @@ module Banian
       end
 
       # --- Drawing -----------------------------------------------------------
+      #
+      # Everything is projected to the screen and drawn with draw2d so the
+      # highlight is always on top. 3D lines drawn exactly over the model's
+      # own edges are hidden by the depth test, which made the selection look
+      # empty.
+
+      MARKER_SIZE = 4 # half size in pixels
+
+      # Draw 3D points on top of the model. GL_LINES takes point pairs; other
+      # modes take one polygon/loop.
+      def draw_on_top(view, mode, points)
+        return if points.nil? || points.empty?
+
+        camera = view.camera
+        eye = camera.perspective? ? camera.eye : nil
+        dir = camera.direction
+        front = ->(pt) { eye.nil? || (pt - eye) % dir > 0.0 }
+        screen = lambda do |pt|
+          sp = view.screen_coords(pt)
+          Geom::Point3d.new(sp.x, sp.y, 0)
+        end
+
+        pts =
+          if mode == GL_LINES
+            out = []
+            points.each_slice(2) do |a, b|
+              next unless b && front.call(a) && front.call(b)
+
+              out << screen.call(a) << screen.call(b)
+            end
+            out
+          else
+            return unless points.all? { |pt| front.call(pt) }
+
+            points.map { |pt| screen.call(pt) }
+          end
+        view.draw2d(mode, pts) unless pts.empty?
+      end
+
+      def draw_squares(view, points, color, size = MARKER_SIZE)
+        return if points.empty?
+
+        camera = view.camera
+        eye = camera.perspective? ? camera.eye : nil
+        dir = camera.direction
+        quads = []
+        points.each do |pt|
+          next unless eye.nil? || (pt - eye) % dir > 0.0
+
+          sp = view.screen_coords(pt)
+          x = sp.x
+          y = sp.y
+          quads << Geom::Point3d.new(x - size, y - size, 0) << Geom::Point3d.new(x + size, y - size, 0) <<
+            Geom::Point3d.new(x + size, y + size, 0) << Geom::Point3d.new(x - size, y + size, 0)
+        end
+        return if quads.empty?
+
+        view.drawing_color = color
+        view.draw2d(GL_QUADS, quads)
+      end
 
       def draw_preselection(view)
         return unless @preselection_corners
@@ -386,7 +453,7 @@ module Banian
         view.drawing_color = Colors::PRESELECTION
         view.line_width = 1
         view.line_stipple = '-'
-        view.draw(GL_LINES, Geometry.box_segments(@preselection_corners))
+        draw_on_top(view, GL_LINES, Geometry.box_segments(@preselection_corners))
         view.line_stipple = ''
       end
 
@@ -407,16 +474,17 @@ module Banian
         unless ghost.empty?
           view.drawing_color = Colors::GHOST
           view.line_width = 1
-          view.line_stipple = '.'
-          view.draw(GL_LINES, ghost)
+          view.line_stipple = '-'
+          draw_on_top(view, GL_LINES, ghost)
         end
 
         view.line_stipple = ''
-        view.line_width = 2
+        view.line_width = 3
         draw_lines(view, normal, Colors::SELECTION)
         draw_lines(view, shared, Colors::SHARED)
 
         unless @preview.boxes.empty?
+          view.line_width = 2
           view.line_stipple = '-'
           boxes = []
           @preview.boxes.each do |box|
@@ -438,15 +506,15 @@ module Banian
           pt = vector ? m.point + vector : m.point
           (m.shared && warn_shared ? shared : normal) << pt
         end
-        view.draw_points(normal, 7, 2, Colors::SELECTION) unless normal.empty?
-        view.draw_points(shared, 7, 2, Colors::SHARED) unless shared.empty?
+        draw_squares(view, normal, Colors::SELECTION)
+        draw_squares(view, shared, Colors::SHARED)
       end
 
       def draw_lines(view, points, color)
         return if points.empty?
 
         view.drawing_color = color
-        view.draw(GL_LINES, points)
+        draw_on_top(view, GL_LINES, points)
       end
 
       def draw_move_guide(view)
@@ -464,10 +532,10 @@ module Banian
         view.drawing_color = color
         view.line_width = @axis_lock ? 2 : 1
         view.line_stipple = '_'
-        view.draw(GL_LINES, [@start, target])
+        draw_on_top(view, GL_LINES, [@start, target])
         view.line_stipple = ''
         view.line_width = 1
-        view.draw_points([@start], 8, 1, Colors::GUIDE)
+        draw_squares(view, [@start], Colors::GUIDE, 3)
       end
 
       # Highlight the edge/face that a click would pick.
@@ -481,10 +549,9 @@ module Banian
         view.line_width = 3
         view.line_stipple = ''
         if entity.is_a?(Sketchup::Edge)
-          view.draw(GL_LINES, [tr * entity.start.position, tr * entity.end.position])
+          draw_on_top(view, GL_LINES, [tr * entity.start.position, tr * entity.end.position])
         else
-          pts = entity.outer_loop.vertices.map { |v| tr * v.position }
-          view.draw(GL_LINE_LOOP, pts)
+          draw_on_top(view, GL_LINE_LOOP, entity.outer_loop.vertices.map { |v| tr * v.position })
         end
         view.line_width = 1
       end

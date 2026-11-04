@@ -24,6 +24,16 @@ module Banian
     module Geometry
       module_function
 
+      # World transformation of the active editing context.
+      #
+      # While the user has a group/component open for editing, SketchUp's Ruby
+      # API reports the positions (and child transformations) of the entities
+      # in that open context in WORLD coordinates, not local ones. So the
+      # active context is always treated as world space (identity).
+      def context_transformation(_model)
+        Geom::Transformation.new
+      end
+
       def instance?(entity)
         entity.is_a?(Sketchup::Group) || entity.is_a?(Sketchup::ComponentInstance)
       end
@@ -130,7 +140,7 @@ module Banian
         @entities.each { |e| bb.add(e.bounds) if e.valid? && e.respond_to?(:bounds) }
         return nil if bb.empty?
 
-        tr = @model.edit_transform
+        tr = Geometry.context_transformation(@model)
         (0..7).map { |i| tr * bb.corner(i) }
       end
     end
@@ -195,7 +205,7 @@ module Banian
       def initialize(model, preselection = nil)
         @model = model
         @preselection = preselection
-        @root = Node.new(model.active_entities, model.edit_transform, [])
+        @root = Node.new(model.active_entities, Geometry.context_transformation(model), [])
       end
 
       def empty?

@@ -29,7 +29,7 @@ module Banian
         @processed = {}
         @model.start_operation(OPERATION_NAME, true)
         begin
-          apply(@plan.root, @model.active_entities, @model.edit_transform)
+          apply(@plan.root, @model.active_entities, Geometry.context_transformation(@model))
           @model.commit_operation
         rescue StandardError
           @model.abort_operation
@@ -66,13 +66,20 @@ module Banian
         descents.each { |inst, child| descend(inst, child, transformation) }
 
         unless vertices.empty?
-          entities.transform_entities(move, vertices)
+          move_vertices(entities, move, local, vertices)
           @moved_vertices += vertices.size
         end
         return if moves.empty?
 
         entities.transform_entities(move, moves)
         @moved_instances += moves.size
+      end
+
+      def move_vertices(entities, move, local, vertices)
+        entities.transform_entities(move, vertices)
+      rescue ArgumentError, TypeError
+        # Fallback for SketchUp versions that refuse vertices here.
+        entities.transform_by_vectors(vertices, Array.new(vertices.size) { local.clone })
       end
 
       def find_vertices(entities, node)

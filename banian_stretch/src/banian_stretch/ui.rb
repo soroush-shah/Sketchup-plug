@@ -95,6 +95,23 @@ module Banian
           nil
         end
 
+        # Information to send along with a bug report.
+        def diagnostics
+          model = Sketchup.active_model
+          log = ErrorReporter.log_path
+          lines = [
+            "Banian Stretch #{VERSION}",
+            "SketchUp #{Sketchup.version} (#{Sketchup.platform}), Ruby #{RUBY_VERSION}",
+            "Filters: #{Settings.filters.map { |k, v| "#{k}=#{v ? 'on' : 'off'}" }.join(', ')}",
+            "Make Unique: #{Settings.make_unique? ? 'on' : 'off'}",
+            "Open edit levels: #{(model.active_path || []).size}",
+            "Selected entities: #{model.selection.size}",
+            "Active tool: #{active_tool_class || 'unknown'}",
+            "Error log: #{log}#{File.exist?(log) ? '' : ' (no errors logged)'}"
+          ]
+          UI.messagebox(lines.join("\n"))
+        end
+
         def icon(name)
           ext = Sketchup.platform == :platform_osx ? 'pdf' : 'svg'
           path = File.join(ICON_DIR, "#{name}.#{ext}")
@@ -116,7 +133,11 @@ module Banian
         end
 
         def command(label, status, action, validation = nil, tooltip: nil, icon_name: nil)
-          cmd = UI::Command.new(label) { action.call }
+          cmd = UI::Command.new(label) do
+            action.call
+          rescue StandardError => e
+            ErrorReporter.report(e, "command #{label}")
+          end
           cmd.status_bar_text = status
           cmd.set_validation_proc { validation.call } if validation
           if icon_name
@@ -172,6 +193,8 @@ module Banian
           menu.add_separator
           s = settings_spec
           menu.add_item(command(I18n.t(:settings), s[:status], s[:action]))
+          menu.add_item(command(I18n.t(:diagnostics), 'Show versions, settings and the error log location.',
+                                -> { diagnostics }))
         end
       end
     end

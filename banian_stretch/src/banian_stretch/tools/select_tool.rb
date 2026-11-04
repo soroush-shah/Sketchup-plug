@@ -14,6 +14,7 @@ module Banian
         @down_flags = 0
         @drag = nil
         @hover = nil
+        @notice = nil
       end
 
       def step_back
@@ -60,6 +61,8 @@ module Banian
       end
 
       def selection_status
+        return @notice if @notice && @plan.empty?
+
         if @plan.empty?
           'Drag a window to select geometry to stretch, or click an edge/face to stretch it. ' \
             "#{ADD_KEY} = add, Shift = remove."
@@ -91,6 +94,12 @@ module Banian
         region = ScreenRegion.new(view, a, b)
         @plan = new_plan if mode == :replace
         @plan.apply_region(region, Settings.filters, mode == :remove ? :remove : :add)
+        @notice = nil
+        if @plan.empty? && mode != :remove
+          UI.beep
+          @notice = 'Nothing was caught. The window must ENCLOSE the corners/ends (vertices) ' \
+                    'you want to stretch - parts of faces are not enough. Check the filter toggles too.'
+        end
         plan_changed
       end
 
@@ -121,5 +130,7 @@ module Banian
         view.draw2d(GL_LINE_LOOP, pts)
       end
     end
+
+    ErrorReporter.guard(SelectTool, BaseTool::CALLBACKS)
   end
 end

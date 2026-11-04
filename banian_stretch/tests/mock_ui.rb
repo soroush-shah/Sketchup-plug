@@ -4,6 +4,7 @@
 # be driven by simulated mouse/keyboard events. The fake view is a top view:
 # screen x = world x, screen y = -world y.
 
+require 'tmpdir'
 require_relative 'mock_sketchup'
 
 MF_CHECKED = 1
@@ -125,6 +126,7 @@ module Sketchup
   class Selection
     def initialize = (@items = [])
     def to_a = @items
+    def size = @items.size
     def add(*e) = @items.concat(e.flatten)
   end
 
@@ -170,7 +172,12 @@ module Sketchup
       @draw_calls += 1
     end
 
-    def draw2d(_mode, pts) = draw(GL_POLYGON, pts)
+    attr_reader :draw2d_calls
+
+    def draw2d(mode, pts)
+      @draw2d_calls = (@draw2d_calls || 0) + 1
+      draw(mode, pts)
+    end
     def draw_points(pts, *_rest) = draw(GL_POLYGON, pts)
   end
 
@@ -228,6 +235,8 @@ module Sketchup
     def format_length(l) = "#{l.to_f.round(4)}\""
     def set_status_text(*args) = (self.status_text = args.first)
     def get_locale = 'en-US'
+    def version = '26.0.0-mock'
+    def temp_dir = Dir.tmpdir
   end
 end
 

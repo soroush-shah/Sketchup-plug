@@ -345,9 +345,9 @@ module Banian
         view.line_width = 2
         view.line_stipple = ''
         if @rotated && @state == :corner2 && @live
-          view.draw(GL_LINES, [@p1, @live])
+          draw_on_top(view, GL_LINES, [@p1, @live])
         elsif @rect
-          view.draw(GL_LINE_LOOP, rectangle_points)
+          draw_on_top(view, GL_LINE_LOOP, rectangle_points)
         end
         view.line_width = 1
       end
@@ -358,9 +358,11 @@ module Banian
         view.drawing_color = Colors::REGION
         view.line_width = 1
         view.line_stipple = stipple
-        view.draw(GL_LINES, Geometry.box_segments(region.corners))
+        draw_on_top(view, GL_LINES, Geometry.box_segments(region.corners))
         view.line_stipple = ''
       end
     end
+
+    ErrorReporter.guard(BoxTool, BaseTool::CALLBACKS)
   end
 end

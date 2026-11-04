@@ -206,12 +206,13 @@ class CoreTest < Minitest::Test
     assert Plan.new(@model).apply_region(slab(60, 200), ALL, :add).empty?
   end
 
-  def test_edit_context_transform
-    # User is editing a group placed at x = 1000; region is in world space.
+  def test_edit_context_uses_world_coordinates
+    # While a group is open for editing, SketchUp reports the open context's
+    # entities in world coordinates; edit_transform must not be applied again.
     @model.edit_transform = Geom::Transformation.translation(Geom::Vector3d.new(1000, 0, 0))
-    MockBuild.box(@ents, [0, 0, 0], [100, 50, 50])
+    MockBuild.box(@ents, [1000, 0, 0], [1100, 50, 50])
     stretch(slab(1060, 1200))
-    assert_equal [0.0, 110.0], MockBuild.xs(@ents)
+    assert_equal [1000.0, 1110.0], MockBuild.xs(@ents)
   end
 
   def test_region_classification

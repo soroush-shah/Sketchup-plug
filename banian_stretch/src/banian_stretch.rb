@@ -9,7 +9,7 @@ require 'extensions.rb'
 module Banian
   module Stretch
     EXTENSION_NAME = 'Banian Stretch'
-    VERSION = '1.0.0'
+    VERSION = '1.0.1'
 
     file = __FILE__.dup
     file.force_encoding('UTF-8') if file.respond_to?(:force_encoding)

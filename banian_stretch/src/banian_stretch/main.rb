@@ -7,6 +7,7 @@ module Banian
     %w[
       settings
       i18n
+      error_reporter
       region
       plan
       applier

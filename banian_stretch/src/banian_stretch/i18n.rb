@@ -17,6 +17,7 @@ module Banian
           filter_vertices: 'Filter: Vertices',
           make_unique: 'Make Unique',
           settings: 'Settings && Help...',
+          diagnostics: 'Diagnostics (report a problem)...',
           error_apply: 'Banian Stretch could not complete the operation:'
         },
         'fa' => {
@@ -30,6 +31,7 @@ module Banian
           filter_vertices: "فیلتر: رأس‌ها",
           make_unique: "یکتاسازی (Make Unique)",
           settings: "تنظیمات و راهنما...",
+          diagnostics: "\u06AF\u0632\u0627\u0631\u0634 \u0645\u0634\u06A9\u0644 (Diagnostics)...",
           error_apply: "عملیات بانیان استرچ انجام نشد:"
         }
       }.freeze

@@ -156,7 +156,7 @@ module Banian
         view.drawing_color = Colors::HOVER
         view.line_width = 2
         view.line_stipple = ''
-        view.draw(GL_LINE_LOOP, face.outer_loop.vertices.map { |v| tr * v.position })
+        draw_on_top(view, GL_LINE_LOOP, face.outer_loop.vertices.map { |v| tr * v.position })
         view.line_width = 1
       end
 
@@ -166,9 +166,11 @@ module Banian
         view.drawing_color = Colors::REGION
         view.line_width = 1
         view.line_stipple = stipple
-        view.draw(GL_LINES, Geometry.box_segments(region.corners))
+        draw_on_top(view, GL_LINES, Geometry.box_segments(region.corners))
         view.line_stipple = ''
       end
     end
+
+    ErrorReporter.guard(FaceTool, BaseTool::CALLBACKS)
   end
 end

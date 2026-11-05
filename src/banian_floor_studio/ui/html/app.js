@@ -6,7 +6,7 @@
     mode: '3d', pattern: 'grid', lang: 'en', units: 'mm',
     length: 600, width: 600, gap: 3, offset: 0.5, wood_min: 600, wood_max: 1800, length_step: 0, stagger: 200,
     chevron_angle: 45, basket_n: 3, small: 300, jitter: 0.8, tilt: 4,
-    angle: 0, anchor: 'corner', align: 'edge', offset_x: 0, offset_y: 0, flip: false,
+    angle: 0, anchor: 'corner', anchor_pt: null, anchor_center: false, align: 'edge', offset_x: 0, offset_y: 0, flip: false,
     thickness: 10, grout_depth: 2, profile: 'chamfer', profile_size: 1.5,
     materials: [], weights: [], mat_mode: 'random', shades: 1, shade_amount: 0.08,
     grout_mat: '', grout_color: '#8a8580', tex_random: true, tex_variants: 6, tex_rot: '180',
@@ -38,6 +38,7 @@
   var PREV = null;
   var busy = false;
   var tPrev = 0, tSave = 0, tToast = 0;
+  var VIEW = null, DRAG = null;
 
   function $(s) { return document.querySelector(s); }
   function $$(s) { return Array.prototype.slice.call(document.querySelectorAll(s)); }
@@ -199,6 +200,7 @@
 
   function vis() {
     $$('[data-p]').forEach(function (el) { el.classList.toggle('hide', el.getAttribute('data-p').split(' ').indexOf(S.pattern) < 0); });
+    $$('[data-anchor]').forEach(function (el) { el.classList.toggle('hide', S.anchor !== el.getAttribute('data-anchor')); });
     $$('[data-m]').forEach(function (el) {
       var ok = el.getAttribute('data-m').split(' ').indexOf(S.mode) >= 0;
       if (el.hasAttribute('data-p') && el.getAttribute('data-p').split(' ').indexOf(S.pattern) < 0) ok = false;
@@ -300,8 +302,8 @@
     var o = PREV.region.outer, minx = 1e18, miny = 1e18, maxx = -1e18, maxy = -1e18;
     o.forEach(function (p) { minx = Math.min(minx, p[0]); maxx = Math.max(maxx, p[0]); miny = Math.min(miny, p[1]); maxy = Math.max(maxy, p[1]); });
     var pad = 14, bw = maxx - minx || 1, bh = maxy - miny || 1;
-    var s = Math.min((r.width - 2 * pad) / bw, (r.height - 2 * pad - 14) / bh);
-    var ox = (r.width - bw * s) / 2, oy = (r.height - 14 - bh * s) / 2;
+    var s = Math.min((r.width - 2 * pad) / bw, (r.height - 2 * pad - 30) / bh);
+    var ox = (r.width - bw * s) / 2, oy = 14 + (r.height - 30 - bh * s) / 2;
     function X(x) { return ox + (x - minx) * s; }
     function Y(y) { return oy + (maxy - y) * s; }
     function loop(pts) { c.moveTo(X(pts[0][0]), Y(pts[0][1])); for (var i = 1; i < pts.length; i++) c.lineTo(X(pts[i][0]), Y(pts[i][1])); c.closePath(); }
@@ -324,6 +326,45 @@
     });
     c.restore();
     regionPath(); c.strokeStyle = line; c.lineWidth = 1.2; c.stroke();
+    VIEW = { s: s, ox: ox, oy: oy, minx: minx, maxy: maxy };
+    var mk = DRAG || PREV.marker;
+    if (mk) {
+      var mx = X(mk[0]), my = Y(mk[1]), acc = cssVar('--accent') || '#0f766e';
+      c.lineWidth = 3; c.strokeStyle = '#fff';
+      c.beginPath(); c.arc(mx, my, 6, 0, Math.PI * 2); c.stroke();
+      c.lineWidth = 1.6; c.strokeStyle = acc;
+      c.beginPath(); c.arc(mx, my, 6, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.moveTo(mx - 10, my); c.lineTo(mx + 10, my); c.moveTo(mx, my - 10); c.lineTo(mx, my + 10); c.stroke();
+    }
+  }
+
+  // canvas px -> local mm, snapping to region corners
+  function canvasToLocal(e) {
+    if (!VIEW || !PREV) return null;
+    var r = $('#cv').getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    var best = null, bd = 9;
+    [PREV.region.outer].concat(PREV.region.holes).forEach(function (lp) {
+      lp.forEach(function (q) {
+        var qx = VIEW.ox + (q[0] - VIEW.minx) * VIEW.s, qy = VIEW.oy + (VIEW.maxy - q[1]) * VIEW.s;
+        var d = Math.sqrt((qx - px) * (qx - px) + (qy - py) * (qy - py));
+        if (d < bd) { bd = d; best = [q[0], q[1]]; }
+      });
+    });
+    if (best) return best;
+    return [VIEW.minx + (px - VIEW.ox) / VIEW.s, VIEW.maxy - (py - VIEW.oy) / VIEW.s];
+  }
+
+  function bindCanvas() {
+    var cv = $('#cv');
+    cv.addEventListener('mousedown', function (e) { var p = canvasToLocal(e); if (!p) return; DRAG = p; draw(); });
+    window.addEventListener('mousemove', function (e) { if (!DRAG) return; var p = canvasToLocal(e); if (p) { DRAG = p; draw(); } });
+    window.addEventListener('mouseup', function () {
+      if (!DRAG) return;
+      var p = DRAG; DRAG = null;
+      if (PREV) PREV.marker = p;
+      draw();
+      call('set_anchor_local', JSON.stringify({ x: p[0], y: p[1], state: S }));
+    });
   }
 
   function changed() {
@@ -392,6 +433,10 @@
       case 'preview':
         PREV = m; draw(); renderStats();
         break;
+      case 'anchor':
+        S.anchor = 'custom'; S.anchor_pt = m.pt; S.offset_x = 0; S.offset_y = 0;
+        render(); changed(); toast(T('anchor_set'));
+        break;
       case 'texture_data':
         renderTexture(m);
         break;
@@ -419,6 +464,8 @@
       b.addEventListener('click', function () { S.angle = +b.getAttribute('data-a'); renderFields(); changed(); });
     });
     $('#dice').addEventListener('click', function () { S.seed = 1 + Math.floor(Math.random() * 99999); renderFields(); changed(); });
+    bindCanvas();
+    $('#pick_pt').addEventListener('click', function () { toast(T('pick_now')); call('pick_point', ''); });
     $('#mat_refresh').addEventListener('click', function () { call('materials', ''); });
     $('#reset').addEventListener('click', function () {
       var keep = { lang: S.lang, units: S.units, mode: S.mode };

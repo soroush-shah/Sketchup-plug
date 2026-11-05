@@ -58,6 +58,20 @@ configs.each do |cfg|
   puts format("\n%-12s tiles=%5d cut=%4d %.3fs", cfg[:pattern], tiles.length, nb, dt)
 end
 
+# custom start point: joint (tile corner) or tile centre exactly on the point
+pt = [1234 * MM, 777 * MM]
+%w[grid brick herringbone hexagon hopscotch].each do |pat|
+  r = FS::Patterns.layout(region, base.merge(:pattern => pat, :anchor => 'custom', :angle => 0.4), :custom => pt)
+  hit = r[:tiles].any? { |t| t.poly.any? { |q| (q[0] - pt[0]).abs < 1e-6 && (q[1] - pt[1]).abs < 1e-6 } }
+  check(hit || %w[hexagon].include?(pat), "custom corner #{pat}")
+  check(r[:marker] == pt, "marker #{pat}")
+  r = FS::Patterns.layout(region, base.merge(:pattern => pat, :anchor => 'custom', :anchor_center => true, :angle => 0.4), :custom => pt)
+  hit = r[:tiles].any? { |t| (t.cx - pt[0]).abs < 1e-6 && (t.cy - pt[1]).abs < 1e-6 }
+  check(hit, "custom centre #{pat}")
+end
+r = FS::Patterns.layout(region, base.merge(:pattern => 'grid', :anchor => 'custom'))
+check(r[:marker] == [0, 0], 'custom without point falls back to corner')
+
 # segment clipping
 idx = G::SegmentIndex.new(G.region_segments(region), 10)
 segs = G.clip_segment_region([-10, 1000 * MM], [4000 * MM, 1000 * MM], region, idx)

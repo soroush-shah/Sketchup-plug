@@ -24,6 +24,43 @@ module BanianStudio
         end
       end
 
+      # Picks a start point in the model (with inference snapping).
+      class PickTool
+        def activate
+          @ip = Sketchup::InputPoint.new
+          Sketchup.status_text = 'Banian Floor Studio: click the start point of the pattern (Esc = cancel)'
+        end
+
+        def deactivate(view)
+          view.invalidate
+        end
+
+        def onMouseMove(_flags, x, y, view)
+          @ip.pick(view, x, y)
+          view.tooltip = @ip.tooltip if @ip.valid?
+          view.invalidate
+        end
+
+        def onLButtonDown(_flags, x, y, view)
+          @ip.pick(view, x, y)
+          return unless @ip.valid?
+          Studio.anchor_picked(@ip.position)
+          Sketchup.active_model.select_tool(nil)
+        end
+
+        def onCancel(_reason, _view)
+          Sketchup.active_model.select_tool(nil)
+        end
+
+        def draw(view)
+          @ip.draw(view) if @ip && @ip.valid?
+        end
+
+        def getExtents
+          Sketchup.active_model.bounds
+        end
+      end
+
       module_function
 
       def model
@@ -61,6 +98,8 @@ module BanianStudio
         d.add_action_callback('apply_texture') { |_c, a| safe { on_apply_texture(parse(a)) } }
         d.add_action_callback('save_state') { |_c, a| save_state(a.to_s) }
         d.add_action_callback('close') { |_c, _a| d.close }
+        d.add_action_callback('pick_point') { |_c, _a| model.select_tool(PickTool.new) }
+        d.add_action_callback('set_anchor_local') { |_c, a| safe { on_set_anchor_local(parse(a)) } }
       end
 
       def parse(a)
@@ -143,14 +182,15 @@ module BanianStudio
         if g
           reg = Region.from_json_h(JSON.parse(g.get_attribute(Builder::DICT, 'region')))
           wo = ORIGIN.transform(g.transformation.inverse)
-          return { :kind => 'group', :group => g, :region => reg, :world_origin => [wo.x.to_f, wo.y.to_f] }
+          return { :kind => 'group', :group => g, :region => reg, :world_origin => [wo.x.to_f, wo.y.to_f],
+                   :frame => g.transformation }
         end
         faces = model.selection.grep(Sketchup::Face)
         unless faces.empty?
           s = Region.from_face(faces.first, p)
           return s.merge(:kind => 'face', :faces => faces)
         end
-        { :kind => 'none', :region => Region.sample, :world_origin => [0, 0] }
+        { :kind => 'none', :region => Region.sample, :world_origin => [0, 0], :frame => Geom::Transformation.new }
       end
 
       # Colour palette matching Builder.material_ctx ordering, without
@@ -192,6 +232,34 @@ module BanianStudio
         format('#%02x%02x%02x', *rgb)
       end
 
+      # Custom start point (stored in the parent/context coords) -> local 2D.
+      def custom_local(frame, p)
+        ap = p[:anchor_pt]
+        return nil unless ap && frame
+        q = Geom::Point3d.new(ap[0], ap[1], ap[2]).transform(frame.inverse)
+        [q.x.to_f, q.y.to_f]
+      end
+
+      def lay_opts(src_or_frame, p, world_origin)
+        frame = src_or_frame.is_a?(Hash) ? src_or_frame[:frame] : src_or_frame
+        { :world_origin => world_origin, :custom => custom_local(frame, p) }
+      end
+
+      # Point picked in the model (world coords) -> active context coords.
+      def anchor_picked(world_pt)
+        pt = world_pt.transform(model.edit_transform.inverse)
+        send_js('anchor', 'pt' => [mm(pt.x.to_f), mm(pt.y.to_f), mm(pt.z.to_f)])
+        @dlg.bring_to_front if @dlg && @dlg.respond_to?(:bring_to_front)
+      end
+
+      # Click on the 2D preview (local mm) -> context coords of current source.
+      def on_set_anchor_local(data)
+        p = Params.from_ui(data['state'] || {})
+        src = source(p)
+        q = Geom::Point3d.new(data['x'].to_f / 25.4, data['y'].to_f / 25.4, 0).transform(src[:frame])
+        send_js('anchor', 'pt' => [mm(q.x.to_f), mm(q.y.to_f), mm(q.z.to_f)])
+      end
+
       def mm(v)
         (v * 25.4).round(1)
       end
@@ -199,7 +267,7 @@ module BanianStudio
       def on_preview(ui)
         p = Params.from_ui(ui)
         src = source(p)
-        lay = Patterns.layout(src[:region], p, :world_origin => src[:world_origin])
+        lay = Patterns.layout(src[:region], p, lay_opts(src, p, src[:world_origin]))
         tiles = lay[:tiles]
         cols, wts = palette(p)
         Materials.assign(tiles, Patterns.norm(p).merge(:mat_mode => p[:mat_mode]), wts, 1)
@@ -213,7 +281,8 @@ module BanianStudio
           'grout' => grout_hex(p),
           'full' => tiles.count { |t| t.state == :inside },
           'cut' => tiles.count { |t| t.state == :boundary },
-          'area' => (region_area(reg) * 0.00064516).round(2)
+          'area' => (region_area(reg) * 0.00064516).round(2),
+          'marker' => [mm(lay[:marker][0]), mm(lay[:marker][1])]
         }
         if tiles.length <= 15_000
           out['tiles'] = tiles.map do |t|
@@ -260,7 +329,7 @@ module BanianStudio
               next unless f.valid?
               Sketchup.status_text = "Banian Floor Studio: #{i + 1}/#{faces.length}"
               s = Region.from_face(f, p)
-              lay = Patterns.layout(s[:region], p, :world_origin => s[:world_origin])
+              lay = Patterns.layout(s[:region], p, lay_opts(s, p, s[:world_origin]))
               r =
                 if mode == 'divide'
                   Builder.divide(model, f, s[:frame], lay, s[:region], p)
@@ -297,7 +366,7 @@ module BanianStudio
         p = Params.from_ui(ui)
         reg = Region.from_json_h(JSON.parse(g.get_attribute(Builder::DICT, 'region')))
         wo = ORIGIN.transform(g.transformation.inverse)
-        lay = Patterns.layout(reg, p, :world_origin => [wo.x.to_f, wo.y.to_f])
+        lay = Patterns.layout(reg, p, lay_opts(g.transformation, p, [wo.x.to_f, wo.y.to_f]))
         ents = g.respond_to?(:definition) ? g.definition.entities : g.entities
         ents.clear!
         r = Builder.build_3d(model, ents, lay, reg, p)
@@ -368,16 +437,7 @@ module BanianStudio
 
       def texture_origin(s, p)
         np = Patterns.norm(p)
-        rb = Geom2D.bbox(s[:region][:outer])
-        o =
-          case np[:anchor].to_s
-          when 'center'
-            rc = Geom2D.rotate(Patterns.ref_center(np), np[:angle])
-            [(rb[0] + rb[2]) * 0.5 - rc[0], (rb[1] + rb[3]) * 0.5 - rc[1]]
-          when 'world' then s[:world_origin]
-          else [rb[0], rb[1]]
-          end
-        [o[0] + np[:offset_x], o[1] + np[:offset_y]]
+        Patterns.origin_for(s[:region], np, lay_opts(s, p, s[:world_origin]))[0]
       end
 
       # ---------------- state ----------------

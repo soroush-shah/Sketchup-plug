@@ -253,6 +253,8 @@ module Sketchup
       @entities = Entities.new; @materials = Materials.new; @definitions = Definitions.new
       @selection = Selection.new; @ops = []
     end
+    def edit_transform; Geom::Transformation.new; end
+    def select_tool(t); @tool = t; end
     def options; { 'UnitsOptions' => { 'LengthUnit' => 2 } }; end
     def start_operation(n, _d); @ops << [:start, n]; end
     def commit_operation; @ops << [:commit]; end

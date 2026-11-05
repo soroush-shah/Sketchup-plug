@@ -10,7 +10,7 @@
 - بدون کندی: موتور اصلی فقط با اولین استفاده بارگذاری می‌شود؛ کاشی‌های تکراری به‌صورت Component ساخته می‌شوند (فایل سبک)
 
 ## نصب
-1. فایل `dist/banian_floor_studio_v1.0.0.rbz` را دانلود کنید.
+1. فایل `dist/banian_floor_studio_v1.1.0.rbz` را دانلود کنید.
 2. در اسکچ‌آپ: `Extensions > Extension Manager > Install Extension` و فایل را انتخاب کنید.
 3. از منوی `Extensions > Banian Floor Studio` یا نوار ابزار استفاده کنید.
 
@@ -29,7 +29,8 @@ Hopscotch (لی‌لی / پین‌ویل)، Stone (سنگ نامنظم Voronoi)�
 ## امکانات
 - سطوح **نامنظم و سوراخ‌دار** (ستون، داکت…)؛ کاشی‌ها دقیق برش می‌خورند و لبه‌های کارخانه‌ای پروفیل خود را حفظ می‌کنند
 - کف، **دیوار** و سقف (هر سطحی با هر زاویه)
-- چرخش، نقطه شروع (گوشه / وسط‌چین / مبدأ جهانی برای پیوستگی بین چند سطح)، جهت (بلندترین لبه / محورها)، جابه‌جایی X/Y
+- **نقطه شروع دلخواه**: با کلیک/کشیدن روی پیش‌نمایش (با گیرکردن به گوشه‌ها) یا با «Pick in model» روی خود مدل؛ انتخاب اینکه درز کاشی یا وسط کاشی روی نقطه بیفتد
+- چرخش، نقطه شروع آماده (گوشه / وسط‌چین / مبدأ جهانی برای پیوستگی بین چند سطح)، جهت (بلندترین لبه / محورها)، جابه‌جایی X/Y
 - پروفیل لبه: Square، Chamfer، Round، Bullnose، Cove، Ogee
 - چند متریال با وزن، توزیع تصادفی / شطرنجی / ترتیبی، سایه‌رنگ‌های تصادفی، جابه‌جایی و چرخش تصادفی تکسچر
 - ناترازی (زاویه و ارتفاع)، Seed تکرارپذیر، حذف تکه‌های خیلی کوچک
@@ -46,10 +47,10 @@ Generate real 3D tiles, parquet, herringbone, chevron, basket weave, hexagon, ho
 face (floors, walls, ceilings) — or just **divide a face** into the pattern. SketchUp 2017–2027, Windows & macOS,
 Persian/English UI.
 
-**Install:** `Extensions > Extension Manager > Install Extension` → `dist/banian_floor_studio_v1.0.0.rbz`.
+**Install:** `Extensions > Extension Manager > Install Extension` → `dist/banian_floor_studio_v1.1.0.rbz`.
 
 **Use:** select one or more faces → `Extensions > Banian Floor Studio` (or the toolbar / right-click menu) →
-pick a mode and pattern → Generate. Select a generated group to edit it later.
+pick a mode and pattern → Generate. Set a custom start point by clicking/dragging on the preview or with **Pick in model**. Select a generated group to edit it later.
 
 ### Performance design
 - Lazy loading: only menus are registered at startup.

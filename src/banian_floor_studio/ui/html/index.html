@@ -29,6 +29,7 @@
   <div class="preview">
     <canvas id="cv"></canvas>
     <div class="src" id="src"></div>
+    <div class="tip" data-t="click_hint"></div>
   </div>
 
   <div class="patterns" id="patterns"></div>
@@ -61,7 +62,9 @@
     <h3 data-t="sec_layout"></h3>
     <div class="field"><label data-t="angle"></label><span class="inp"><input data-k="angle" data-kind="num"><i>°</i></span></div>
     <div class="chips" id="angle_chips"><button type="button" data-a="0">0°</button><button type="button" data-a="45">45°</button><button type="button" data-a="90">90°</button><button type="button" data-a="-45">-45°</button></div>
-    <div class="field"><label data-t="anchor"></label><select data-k="anchor" data-kind="str"><option value="corner" data-t="anchor_corner"></option><option value="center" data-t="anchor_center"></option><option value="world" data-t="anchor_world"></option></select></div>
+    <div class="field"><label data-t="anchor"></label><select data-k="anchor" data-kind="str"><option value="corner" data-t="anchor_corner"></option><option value="center" data-t="anchor_center"></option><option value="world" data-t="anchor_world"></option><option value="custom" data-t="anchor_custom"></option></select></div>
+    <div class="field" data-anchor="custom"><label data-t="custom_pt"></label><span class="inp row"><button type="button" class="ghost small grow" id="pick_pt" data-t="pick_point"></button></span></div>
+    <div class="field check" data-anchor="custom"><label><input type="checkbox" data-k="anchor_center" data-kind="bool"><span data-t="anchor_center_opt"></span></label></div>
     <div class="field"><label data-t="align"></label><select data-k="align" data-kind="str"><option value="edge" data-t="align_edge"></option><option value="world" data-t="align_world"></option></select></div>
     <div class="field"><label data-t="offset_x"></label><span class="inp"><input data-k="offset_x" data-kind="len"><i class="u"></i></span></div>
     <div class="field"><label data-t="offset_y"></label><span class="inp"><input data-k="offset_y" data-kind="len"><i class="u"></i></span></div>

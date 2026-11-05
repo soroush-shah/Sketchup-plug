@@ -62,6 +62,7 @@ module BanianStudio
         q[:offset_x] = num(p, :offset_x, 0.0)
         q[:offset_y] = num(p, :offset_y, 0.0)
         q[:seed] = num(p, :seed, 1).to_i
+        q[:anchor_center] = p[:anchor_center] == true || p[:anchor_center].to_s == 'true'
         q[:pattern] = LIST.include?(p[:pattern].to_s) ? p[:pattern].to_s : 'grid'
         q[:gap] = [q[:gap], 0.02].max if q[:pattern] == 'voronoi'
         q
@@ -374,22 +375,36 @@ module BanianStudio
       # ---- layout driver ----------------------------------------------------
       # region: {:outer, :holes} in local coords. opts[:world_origin] local pt.
       # Returns {:tiles => [Tile(state :inside/:boundary)], :origin, :theta}
+      # Pattern origin (local) + the visible start-point marker.
+      # anchor: corner | center | world | custom (opts[:custom] local pt).
+      # p[:anchor_center]: put a tile centre (instead of a joint) on the point.
+      def origin_for(region, p, opts = {})
+        rb = Geom2D.bbox(region[:outer])
+        theta = p[:angle]
+        anchor = p[:anchor].to_s
+        anchor = 'corner' if anchor == 'custom' && opts[:custom].nil?
+        pt =
+          case anchor
+          when 'center' then [(rb[0] + rb[2]) * 0.5, (rb[1] + rb[3]) * 0.5]
+          when 'world' then opts[:world_origin] || [0.0, 0.0]
+          when 'custom' then opts[:custom]
+          else [rb[0], rb[1]]
+          end
+        pt = [pt[0] + p[:offset_x], pt[1] + p[:offset_y]]
+        centered = anchor == 'center' || (anchor == 'custom' && p[:anchor_center])
+        origin = pt
+        if centered
+          rc = Geom2D.rotate(ref_center(p), theta)
+          origin = [pt[0] - rc[0], pt[1] - rc[1]]
+        end
+        [origin, pt]
+      end
+
       def layout(region, praw, opts = {})
         p = norm(praw)
         rb = Geom2D.bbox(region[:outer])
         theta = p[:angle]
-        origin =
-          case p[:anchor].to_s
-          when 'center'
-            rc = Geom2D.rotate(ref_center(p), theta)
-            [(rb[0] + rb[2]) * 0.5 - rc[0], (rb[1] + rb[3]) * 0.5 - rc[1]]
-          when 'world'
-            wo = opts[:world_origin] || [0.0, 0.0]
-            [wo[0], wo[1]]
-          else
-            [rb[0], rb[1]]
-          end
-        origin = [origin[0] + p[:offset_x], origin[1] + p[:offset_y]]
+        origin, marker = origin_for(region, p, opts)
 
         est = (rb[2] - rb[0] + max_dim(p)) * (rb[3] - rb[1] + max_dim(p)) / tile_area(p)
         limit = opts[:max_tiles] || MAX_TILES
@@ -425,7 +440,7 @@ module BanianStudio
           tiles << t
           raise TooManyTiles, tiles.length.to_s if tiles.length > limit
         end
-        { :tiles => tiles, :origin => origin, :theta => theta, :params => p, :index => index }
+        { :tiles => tiles, :origin => origin, :marker => marker, :theta => theta, :params => p, :index => index }
       end
 
       # Tiles covering one texture period (pattern frame, unrotated) for

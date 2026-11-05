@@ -6,7 +6,7 @@ require 'extensions.rb'
 module BanianStudio
   module FloorStudio
     PLUGIN_ID = 'banian_floor_studio'.freeze
-    VERSION = '1.0.0'.freeze
+    VERSION = '1.1.0'.freeze
 
     unless file_loaded?(__FILE__)
       ex = SketchupExtension.new('Banian Floor Studio', File.join(PLUGIN_ID, 'main'))

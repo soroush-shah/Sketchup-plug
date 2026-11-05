@@ -95,6 +95,22 @@ check.call(dlg.last('done'), "rebuild #{dlg.last('error') && dlg.last('error')['
 FS::Studio.shuffle
 check.call(model.ops.last == [:commit], 'shuffle')
 
+# custom start point: click on preview, pick in model, then build
+model.selection.clear
+model.selection.add(room)
+dlg.msgs.clear
+FS::Studio.on_set_anchor_local('x' => 1000, 'y' => 500, 'state' => { 'pattern' => 'grid' })
+an = dlg.last('anchor')
+check.call(an && (an['pt'][0] - 1000).abs < 0.2 && (an['pt'][1] - 500).abs < 0.2, "anchor from preview #{an.inspect}")
+FS::Studio.anchor_picked(Geom::Point3d.new(300 * mm, 200 * mm, 0))
+check.call(dlg.last('anchor')['pt'][0] == 300.0, 'anchor from model pick')
+cu = { 'mode' => '3d', 'pattern' => 'grid', 'length' => 600, 'width' => 600, 'anchor' => 'custom', 'anchor_pt' => [1000, 500, 0] }
+FS::Studio.on_preview(cu)
+check.call(dlg.last('preview')['marker'] == [1000.0, 500.0], "preview marker #{dlg.last('preview')['marker']}")
+FS::Studio.safe { FS::Studio.on_apply(cu) }
+check.call(dlg.last('done'), "apply with custom anchor #{dlg.last('error') && dlg.last('error')['detail']}")
+check.call(defined?(FS::Studio::PickTool), 'pick tool defined')
+
 # too many tiles -> error message, no crash
 model.selection.clear
 model.selection.add(room)

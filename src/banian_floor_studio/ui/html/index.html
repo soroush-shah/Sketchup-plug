@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banian Floor Studio</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" class="logo" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5" class="o"/><rect x="3" y="13" width="8" height="8" rx="1.5" class="o"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+    <span class="title">Floor Studio</span>
+  </div>
+  <div class="tools">
+    <select id="units" title="Units"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">in</option></select>
+    <button id="lang" class="ghost small" type="button">فا</button>
+  </div>
+</header>
+
+<main id="scroll">
+  <div class="seg" id="modes">
+    <button type="button" data-mode="3d" data-t="mode_3d"></button>
+    <button type="button" data-mode="divide" data-t="mode_divide"></button>
+    <button type="button" data-mode="texture" data-t="mode_texture"></button>
+  </div>
+  <p class="hint" id="mode_hint"></p>
+
+  <div class="preview">
+    <canvas id="cv"></canvas>
+    <div class="src" id="src"></div>
+  </div>
+
+  <div class="patterns" id="patterns"></div>
+
+  <section data-sec="size">
+    <h3 data-t="sec_size"></h3>
+    <div class="field" data-p="grid brick herringbone chevron basket hexagon hopscotch voronoi siding"><label data-tl="length"></label><span class="inp"><input data-k="length" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="grid brick herringbone chevron wood siding"><label data-tl="width"></label><span class="inp"><input data-k="width" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="hopscotch"><label data-t="small"></label><span class="inp"><input data-k="small" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="wood"><label data-t="wood_min"></label><span class="inp"><input data-k="wood_min" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="wood"><label data-t="wood_max"></label><span class="inp"><input data-k="wood_max" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="wood"><label data-t="length_step"></label><span class="inp"><input data-k="length_step" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="wood"><label data-t="stagger"></label><span class="inp"><input data-k="stagger" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-p="brick siding"><label data-t="offset"></label>
+      <select data-k="offset" data-kind="num"><option value="0.5">1/2</option><option value="0.3333333333">1/3</option><option value="0.25">1/4</option><option value="0.2">1/5</option><option value="0.6666666667">2/3</option><option value="0">0</option></select></div>
+    <div class="field" data-p="chevron"><label data-t="chevron_angle"></label><span class="inp"><input data-k="chevron_angle" data-kind="num"><i>°</i></span></div>
+    <div class="field" data-p="basket"><label data-t="basket_n"></label><span class="inp"><input data-k="basket_n" data-kind="int"><i></i></span></div>
+    <div class="field" data-p="voronoi"><label data-t="jitter"></label><span class="inp"><input data-k="jitter" data-kind="num" type="range" min="0" max="1" step="0.05"></span></div>
+    <div class="field" data-p="siding" data-m="3d"><label data-t="tilt"></label><span class="inp"><input data-k="tilt" data-kind="num"><i>°</i></span></div>
+  </section>
+
+  <section data-sec="joint">
+    <h3 data-t="sec_joint"></h3>
+    <div class="field"><label data-t="gap"></label><span class="inp"><input data-k="gap" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-m="3d"><label data-t="grout_depth"></label><span class="inp"><input data-k="grout_depth" data-kind="len"><i class="u"></i></span></div>
+    <div class="field"><label data-t="grout_color"></label><span class="inp row"><input data-k="grout_color" data-kind="str" type="color"><select data-k="grout_mat" data-kind="str" class="matsel"></select></span></div>
+  </section>
+
+  <section data-sec="layout">
+    <h3 data-t="sec_layout"></h3>
+    <div class="field"><label data-t="angle"></label><span class="inp"><input data-k="angle" data-kind="num"><i>°</i></span></div>
+    <div class="chips" id="angle_chips"><button type="button" data-a="0">0°</button><button type="button" data-a="45">45°</button><button type="button" data-a="90">90°</button><button type="button" data-a="-45">-45°</button></div>
+    <div class="field"><label data-t="anchor"></label><select data-k="anchor" data-kind="str"><option value="corner" data-t="anchor_corner"></option><option value="center" data-t="anchor_center"></option><option value="world" data-t="anchor_world"></option></select></div>
+    <div class="field"><label data-t="align"></label><select data-k="align" data-kind="str"><option value="edge" data-t="align_edge"></option><option value="world" data-t="align_world"></option></select></div>
+    <div class="field"><label data-t="offset_x"></label><span class="inp"><input data-k="offset_x" data-kind="len"><i class="u"></i></span></div>
+    <div class="field"><label data-t="offset_y"></label><span class="inp"><input data-k="offset_y" data-kind="len"><i class="u"></i></span></div>
+    <div class="field check" data-m="3d"><label><input type="checkbox" data-k="flip" data-kind="bool"><span data-t="flip"></span></label></div>
+  </section>
+
+  <section data-sec="tile" data-m="3d">
+    <h3 data-t="sec_tile"></h3>
+    <div class="field"><label data-t="thickness"></label><span class="inp"><input data-k="thickness" data-kind="len"><i class="u"></i></span></div>
+    <div class="field"><label data-t="profile"></label><select data-k="profile" data-kind="str">
+      <option value="square" data-t="pr_square"></option><option value="chamfer" data-t="pr_chamfer"></option><option value="round" data-t="pr_round"></option>
+      <option value="bullnose" data-t="pr_bullnose"></option><option value="cove" data-t="pr_cove"></option><option value="ogee" data-t="pr_ogee"></option></select></div>
+    <div class="field"><label data-t="profile_size"></label><span class="inp"><input data-k="profile_size" data-kind="len"><i class="u"></i></span></div>
+  </section>
+
+  <section data-sec="mat">
+    <h3><span data-t="sec_mat"></span><button type="button" class="ghost small" id="mat_refresh" data-t="refresh"></button></h3>
+    <p class="hint" data-t="mat_hint"></p>
+    <div id="matlist" class="matlist"></div>
+    <div class="field"><label data-t="mat_mode"></label><select data-k="mat_mode" data-kind="str"><option value="random" data-t="mm_random"></option><option value="checker" data-t="mm_checker"></option><option value="sequence" data-t="mm_sequence"></option></select></div>
+    <div class="field" data-m="3d divide"><label data-t="shades"></label><span class="inp"><input data-k="shades" data-kind="int"><i></i></span></div>
+    <div class="field" data-m="3d divide"><label data-t="shade_amount"></label><span class="inp"><input data-k="shade_amount" data-kind="num" type="range" min="0" max="0.3" step="0.01"></span></div>
+    <div class="field check" data-m="3d divide"><label><input type="checkbox" data-k="tex_random" data-kind="bool"><span data-t="tex_random"></span></label></div>
+    <div class="field" data-m="3d divide"><label data-t="tex_rot"></label><select data-k="tex_rot" data-kind="str"><option value="none" data-t="rot_none"></option><option value="180">180°</option><option value="90">90°</option><option value="random" data-t="rot_random"></option></select></div>
+  </section>
+
+  <section data-sec="extra">
+    <h3 data-t="sec_extra"></h3>
+    <div class="field"><label data-t="seed"></label><span class="inp row"><input data-k="seed" data-kind="int"><button type="button" class="ghost small" id="dice" title="Shuffle">⚄</button></span></div>
+    <div class="field" data-m="3d"><label data-t="imp_angle"></label><span class="inp"><input data-k="imp_angle" data-kind="num"><i>°</i></span></div>
+    <div class="field" data-m="3d"><label data-t="imp_height"></label><span class="inp"><input data-k="imp_height" data-kind="len"><i class="u"></i></span></div>
+    <div class="field" data-m="3d"><label data-t="min_piece"></label><span class="inp"><input data-k="min_piece" data-kind="len"><i class="u"></i></span></div>
+    <div class="field check" data-m="3d"><label><input type="checkbox" data-k="keep_face" data-kind="bool"><span data-t="keep_face"></span></label></div>
+    <div class="field check" data-m="divide"><label><input type="checkbox" data-k="paint" data-kind="bool"><span data-t="paint"></span></label></div>
+    <div class="field check" data-m="divide"><label><input type="checkbox" data-k="paint_grout" data-kind="bool"><span data-t="paint_grout"></span></label></div>
+    <div class="field" data-m="texture"><label data-t="tex_ppm"></label><span class="inp"><input data-k="tex_ppm" data-kind="num"><i>px/mm</i></span></div>
+    <button type="button" class="ghost small reset" id="reset" data-t="reset"></button>
+  </section>
+</main>
+
+<footer class="bottom">
+  <div class="stats" id="stats"></div>
+  <button type="button" class="primary" id="apply"></button>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -11,7 +11,7 @@ module BanianStudio
 
     def self.supported?
       if Sketchup.version.to_i < MIN_SU_VERSION || !defined?(UI::HtmlDialog)
-        UI.messagebox('پلاگین متن فارسی به SketchUp 2017 یا جدیدتر نیاز دارد.')
+        UI.messagebox("Persian Text requires SketchUp 2017 or newer.\nپلاگین متن فارسی به SketchUp 2017 یا جدیدتر نیاز دارد.")
         return false
       end
       true
@@ -35,7 +35,7 @@ module BanianStudio
       if inst
         Dialog.open_edit(inst)
       else
-        UI.messagebox('یک متن فارسی (ساخته‌شده با همین پلاگین) را انتخاب کنید.')
+        UI.messagebox("Select a text created with Persian Text.\nیک متن ساخته‌شده با همین پلاگین را انتخاب کنید.")
       end
     end
 
@@ -44,24 +44,24 @@ module BanianStudio
       ext = Sketchup.platform == :platform_win ? 'svg' : 'pdf'
       ext = 'png' unless File.exist?(File.join(icons, "new_text.#{ext}"))
 
-      cmd_new = UI::Command.new('متن فارسی جدید') { new_text }
-      cmd_new.tooltip = 'متن فارسی جدید'
-      cmd_new.status_bar_text = 'ساخت متن سه‌بعدی فارسی با فونت‌های نصب‌شده روی ویندوز'
+      cmd_new = UI::Command.new('New Persian Text') { new_text }
+      cmd_new.tooltip = 'New Persian Text'
+      cmd_new.status_bar_text = 'Create shaped Persian/Arabic 3D text with any installed font'
       cmd_new.small_icon = File.join(icons, "new_text.#{ext}")
       cmd_new.large_icon = File.join(icons, "new_text.#{ext}")
 
-      cmd_edit = UI::Command.new('ویرایش متن فارسی') { edit_selected }
-      cmd_edit.tooltip = 'ویرایش متن فارسی انتخاب‌شده'
-      cmd_edit.status_bar_text = 'متن فارسی انتخاب‌شده را دوباره ویرایش کنید'
+      cmd_edit = UI::Command.new('Edit Persian Text') { edit_selected }
+      cmd_edit.tooltip = 'Edit Persian Text'
+      cmd_edit.status_bar_text = 'Edit the selected Persian text'
       cmd_edit.small_icon = File.join(icons, "edit_text.#{ext}")
       cmd_edit.large_icon = File.join(icons, "edit_text.#{ext}")
       cmd_edit.set_validation_proc { selected_text_instance ? MF_ENABLED : MF_GRAYED }
 
-      menu = UI.menu('Extensions').add_submenu('متن فارسی')
+      menu = UI.menu('Extensions').add_submenu('Persian Text')
       menu.add_item(cmd_new)
       menu.add_item(cmd_edit)
 
-      tb = UI::Toolbar.new('متن فارسی')
+      tb = UI::Toolbar.new('Persian Text')
       tb.add_item(cmd_new)
       tb.add_item(cmd_edit)
       tb.restore

@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>متن فارسی</title>
+<title>Persian Text – متن فارسی</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
   <header>
     <div class="title">
-      <strong id="modeTitle">متن فارسی جدید</strong>
-      <span id="backend" class="badge">در حال آماده‌سازی…</span>
+      <strong id="modeTitle">متن فارسی جدید <span class="en">New Persian Text</span></strong>
+      <span id="backend" class="badge">…</span>
     </div>
     <div class="header-actions">
-      <button id="btnPick" class="ghost" title="متن فارسیِ انتخاب‌شده در مدل را برای ویرایش باز کن">ویرایش متنِ انتخاب‌شده</button>
+      <button id="btnPick" class="ghost" title="Edit the Persian text selected in the model">ویرایش متنِ انتخاب‌شده <span class="en">Edit selected</span></button>
     </div>
   </header>
 
@@ -22,15 +22,15 @@
     <section class="controls">
       <!-- Text -->
       <div class="card">
-        <label class="card-title" for="text">متن</label>
-        <textarea id="text" rows="3" dir="auto" placeholder="متن خود را اینجا بنویسید…"></textarea>
+        <label class="card-title" for="text">متن <span class="en">Text</span></label>
+        <textarea id="text" rows="3" dir="auto" placeholder="متن خود را اینجا بنویسید… / Type your text here…"></textarea>
         <div class="row small">
-          <label class="check"><input type="checkbox" id="persianDigits"> تبدیل اعداد به فارسی</label>
-          <label class="inline">جهت:
+          <label class="check"><input type="checkbox" id="persianDigits"> اعداد فارسی <span class="en">Persian digits</span></label>
+          <label class="inline">جهت <span class="en">Direction</span>
             <select id="baseDir">
-              <option value="auto">خودکار</option>
-              <option value="rtl">راست‌به‌چپ</option>
-              <option value="ltr">چپ‌به‌راست</option>
+              <option value="auto">خودکار / Auto</option>
+              <option value="rtl">راست‌به‌چپ / RTL</option>
+              <option value="ltr">چپ‌به‌راست / LTR</option>
             </select>
           </label>
         </div>
@@ -38,70 +38,76 @@
 
       <!-- Font -->
       <div class="card">
-        <div class="card-title">فونت</div>
+        <div class="card-title">فونت <span class="en">Font</span></div>
         <div class="row">
-          <input type="search" id="fontSearch" placeholder="جستجوی فونت…">
-          <label class="check"><input type="checkbox" id="onlyPersian" checked> فقط فونت‌های فارسی</label>
+          <input type="search" id="fontSearch" placeholder="جستجوی فونت / Search fonts…">
         </div>
-        <div id="fontList" class="font-list" tabindex="0"></div>
+        <div class="row small">
+          <label class="check"><input type="checkbox" id="onlyPersian" checked> فقط فونت‌های فارسی <span class="en">Persian only</span></label>
+          <label class="check"><input type="checkbox" id="showSamples" checked> نمونه‌ی متن <span class="en">Samples</span></label>
+          <span id="fontCount" class="muted"></span>
+        </div>
+        <div id="fontList" class="font-list" tabindex="0"><div id="fontInner" class="font-inner"></div></div>
         <div class="row">
-          <label class="inline grow">سبک:
+          <label class="inline grow">سبک <span class="en">Style</span>
             <select id="fontStyle"></select>
           </label>
-          <button id="btnBrowse" class="ghost" title="یک فایل فونت (ttf/otf) که نصب نیست را انتخاب کنید">فایل فونت…</button>
-          <button id="btnRescan" class="ghost icon" title="بازخوانی فونت‌های نصب‌شده">⟳</button>
+          <button id="btnBrowse" class="ghost" title="Load a font file that is not installed (ttf/otf)">فایل فونت… <span class="en">File…</span></button>
+          <button id="btnRescan" class="ghost icon" title="بازخوانی فونت‌ها / Rescan installed fonts">⟳</button>
         </div>
         <div id="axes"></div>
       </div>
 
       <!-- Size & layout -->
       <div class="card">
-        <div class="card-title">اندازه و چیدمان</div>
+        <div class="card-title">اندازه و چیدمان <span class="en">Size &amp; layout</span></div>
         <div class="grid2">
-          <label>ارتفاع
-            <input type="text" id="height" value="30cm" dir="ltr">
+          <label>ارتفاع <span class="en">Height</span>
+            <span class="len"><input type="text" id="height" value="30" dir="ltr"><span class="unit"></span></span>
           </label>
-          <label>معیار ارتفاع
+          <label>معیار ارتفاع <span class="en">Height means</span>
             <select id="heightMode">
-              <option value="em">اندازه‌ی فونت</option>
-              <option value="ink">ارتفاع واقعی کل متن</option>
+              <option value="em">اندازه‌ی فونت / Font size</option>
+              <option value="ink">ارتفاع واقعی متن / Actual text height</option>
             </select>
           </label>
-          <label>تراز
+          <label>تراز <span class="en">Align</span>
             <span class="seg" id="alignSeg">
-              <button data-v="right" title="راست">راست</button><button data-v="center" title="وسط">وسط</button><button data-v="left" title="چپ">چپ</button>
+              <button data-v="right">راست<br><small>Right</small></button><button data-v="center">وسط<br><small>Center</small></button><button data-v="left">چپ<br><small>Left</small></button>
             </span>
           </label>
-          <label>فاصله‌ی سطرها <output id="lineSpacingOut"></output>
+          <label>فاصله‌ی سطرها <span class="en">Line spacing</span> <output id="lineSpacingOut"></output>
             <input type="range" id="lineSpacing" min="0.8" max="3" step="0.05" value="1.6">
           </label>
-          <label>فاصله‌ی کلمات <output id="wordSpacingOut"></output>
+          <label>فاصله‌ی کلمات <span class="en">Word spacing</span> <output id="wordSpacingOut"></output>
             <input type="range" id="wordSpacing" min="-20" max="150" step="1" value="0">
           </label>
-          <label>فاصله‌ی حروف لاتین <output id="letterSpacingOut"></output>
+          <label>فاصله‌ی حروف لاتین <span class="en">Latin letter spacing</span> <output id="letterSpacingOut"></output>
             <input type="range" id="letterSpacing" min="-10" max="60" step="1" value="0">
           </label>
         </div>
+        <div class="hint">٪ = درصدی از اندازه‌ی فونت <span class="en">% = percent of font size</span></div>
       </div>
 
       <!-- Style -->
       <div class="card">
-        <div class="card-title">ظاهر</div>
+        <div class="card-title">ظاهر <span class="en">Appearance</span></div>
         <div class="grid2">
-          <label>ضخیم/نازک‌کردن <output id="boldOut"></output>
+          <label>ضخیم/نازک‌کردن <span class="en">Bolder / thinner</span> <output id="boldOut"></output>
             <input type="range" id="bold" min="-4" max="10" step="0.25" value="0">
           </label>
-          <label>کج (ایتالیک) <output id="slantOut"></output>
+          <label>کج (ایتالیک) <span class="en">Slant</span> <output id="slantOut"></output>
             <input type="range" id="slant" min="-25" max="25" step="1" value="0">
           </label>
-          <label>شعاع قوس (۰ = صاف)
-            <input type="text" id="arc" value="0" dir="ltr" title="عدد مثبت: قوس رو به بالا، منفی: رو به پایین">
+          <label>شعاع قوس <span class="en">Arc radius</span>
+            <span class="len"><input type="text" id="arc" value="0" dir="ltr" title="0 = flat. Positive: arch up, negative: arch down"><span class="unit"></span></span>
+            <small class="muted">۰ یعنی صاف <span class="en">0 = straight</span></small>
           </label>
-          <label>کیفیت منحنی‌ها
+          <label>کیفیت منحنی‌ها <span class="en">Curve quality</span>
             <select id="quality">
-              <option value="low">کم (سبک)</option>
-              <option value="medium" selected>متوسط</option>
-              <option value="high">زیاد</option>
+              <option value="low">کم / Low</option>
+              <option value="medium" selected>متوسط / Medium</option>
+              <option value="high">زیاد / High</option>
             </select>
           </label>
         </div>
@@ -109,34 +115,37 @@
 
       <!-- 3D -->
       <div class="card">
-        <div class="card-title">سه‌بعدی و متریال</div>
+        <div class="card-title">سه‌بعدی و متریال <span class="en">3D &amp; material</span></div>
         <div class="grid2">
-          <label>نوع
+          <label>نوع <span class="en">Type</span>
             <span class="seg" id="filledSeg">
-              <button data-v="1">سطح پر</button><button data-v="0">فقط خط دور</button>
+              <button data-v="1">سطح پر<br><small>Filled</small></button><button data-v="0">فقط خط دور<br><small>Outline</small></button>
             </span>
           </label>
-          <label>ضخامت اکسترود (۰ = تخت)
-            <input type="text" id="extrude" value="0" dir="ltr">
+          <label>ضخامت (اکسترود) <span class="en">Extrude depth</span>
+            <span class="len"><input type="text" id="extrude" value="0" dir="ltr"><span class="unit"></span></span>
+            <small class="muted">۰ یعنی تخت <span class="en">0 = flat</span></small>
           </label>
-          <label>فاصله از سطح
-            <input type="text" id="zOffset" value="0" dir="ltr" title="برای جلوگیری از تداخل با سطحی که متن روی آن چسبیده">
+          <label>فاصله از سطح <span class="en">Offset from face</span>
+            <span class="len"><input type="text" id="zOffset" value="0" dir="ltr" title="Lifts the text off the face it is glued to (avoids z-fighting)"><span class="unit"></span></span>
           </label>
-          <label>متریال
+          <label>متریال <span class="en">Material</span>
             <span class="row tight">
               <select id="material" class="grow"></select>
-              <input type="color" id="color" value="#1f3a5f" title="ساخت متریال با این رنگ">
+              <input type="color" id="color" value="#1f3a5f" title="رنگ دلخواه / Custom color">
             </span>
           </label>
         </div>
-        <label class="check"><input type="checkbox" id="smooth" checked> نرم‌کردن لبه‌های کناری (برای متن اکسترودشده)</label>
+        <label class="check"><input type="checkbox" id="smooth" checked> نرم‌کردن لبه‌های کناری <span class="en">Smooth side edges</span></label>
+        <div class="hint" id="unitHint"></div>
       </div>
     </section>
 
     <section class="preview-pane">
       <div class="preview-head">
-        <span>پیش‌نمایش</span>
+        <span>پیش‌نمایش <span class="en">Preview</span></span>
         <span id="dims" class="muted"></span>
+        <label class="check small"><input type="checkbox" id="livePreview" checked> زنده <span class="en">Live</span></label>
       </div>
       <div id="preview" class="preview"><div class="empty">…</div></div>
       <div id="status" class="status"></div>
@@ -144,16 +153,15 @@
   </main>
 
   <footer>
-    <label class="check"><input type="checkbox" id="keepOpen"> پنجره باز بماند</label>
-    <label class="check" id="editAllWrap" hidden><input type="checkbox" id="editAll"> اعمال روی همه‌ی کپی‌ها</label>
+    <label class="check"><input type="checkbox" id="keepOpen"> پنجره باز بماند <span class="en">Keep open</span></label>
+    <label class="check" id="editAllWrap" hidden><input type="checkbox" id="editAll"> اعمال روی همه‌ی کپی‌ها <span class="en">Apply to all copies</span></label>
     <span class="spacer"></span>
-    <button id="btnCancel" class="ghost">بستن</button>
-    <button id="btnBuild" class="primary" disabled>ساخت و قرار دادن</button>
+    <button id="btnCancel" class="ghost">بستن <span class="en">Close</span></button>
+    <button id="btnBuild" class="primary" disabled>ساخت و قرار دادن <span class="en">Create &amp; place</span></button>
   </footer>
 </div>
 
 <script src="lib/clipper.js"></script>
-<script src="lib/opentype.min.js"></script>
 <script src="lib/hb_wasm.js"></script>
 <script src="engine.js"></script>
 <script src="app.js"></script>

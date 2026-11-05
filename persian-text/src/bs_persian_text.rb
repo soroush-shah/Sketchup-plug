@@ -9,12 +9,12 @@ require 'extensions.rb'
 module BanianStudio
   module PersianText
     PLUGIN_ID = 'bs_persian_text'.freeze
-    PLUGIN_VERSION = '1.0.0'.freeze
+    PLUGIN_VERSION = '1.1.0'.freeze
     PLUGIN_DIR = File.join(File.dirname(__FILE__), PLUGIN_ID).freeze
 
     unless file_loaded?(__FILE__)
-      ext = SketchupExtension.new('Persian Text (متن فارسی)', File.join(PLUGIN_ID, 'main'))
-      ext.description = 'نوشتن متن فارسی سه‌بعدی و قابل ویرایش در اسکچ‌آپ با هر فونت نصب‌شده روی ویندوز.'
+      ext = SketchupExtension.new('Persian Text', File.join(PLUGIN_ID, 'main'))
+      ext.description = 'Correctly shaped, editable Persian/Arabic 3D text using any installed Windows font. / نوشتن متن فارسی سه‌بعدی و قابل ویرایش با هر فونت نصب‌شده.'
       ext.version = PLUGIN_VERSION
       ext.creator = 'Banian Studio'
       ext.copyright = '2026 Banian Studio'

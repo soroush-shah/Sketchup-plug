@@ -8,6 +8,7 @@ module BanianStudio
     class Dialog
 
       FONT_CHUNK = 400_000
+      @@font_list = nil
 
       class << self
         # Opens the dialog for creating a new text.
@@ -21,7 +22,7 @@ module BanianStudio
         def open_edit(inst)
           params = Builder.params_of(inst.definition)
           unless params
-            UI.messagebox('این آبجکت با پلاگین متن فارسی ساخته نشده است.')
+            UI.messagebox("This object was not created with Persian Text.\nاین آبجکت با پلاگین متن فارسی ساخته نشده است.")
             return
           end
           dlg = instance
@@ -65,7 +66,7 @@ module BanianStudio
 
       def build_dialog
         dlg = UI::HtmlDialog.new(
-          dialog_title: 'متن فارسی',
+          dialog_title: 'Persian Text - متن فارسی',
           preferences_key: 'BanianStudio_PersianText_v1',
           scrollable: true,
           resizable: true,
@@ -156,8 +157,12 @@ module BanianStudio
         send_js('onMode', data)
       end
 
+      # The installed-font list is kept in memory for the SketchUp session;
+      # only the first open (or "Rescan") reads the font folder.
       def fonts_payload(force)
-        list = Fonts.list(force)
+        @@font_list = nil if force
+        @@font_list ||= Fonts.list(force)
+        list = @@font_list
         list += custom_fonts
         { 'fonts' => list }
       end
@@ -175,7 +180,7 @@ module BanianStudio
       def on_get_font(data, req)
         path = data['path'].to_s
         unless File.exist?(path)
-          reply(req, 'error' => "فایل فونت پیدا نشد:\n#{path}")
+          reply(req, 'error' => "فایل فونت پیدا نشد / Font file not found: #{path}")
           return
         end
         b64 = [File.binread(path)].pack('m0')
@@ -209,7 +214,7 @@ module BanianStudio
         params = data['params'] || {}
         polys = data['polys'] || []
         if polys.empty?
-          UI.messagebox('متنی برای ساخت وجود ندارد.')
+          UI.messagebox("Nothing to create.\nمتنی برای ساخت وجود ندارد.")
           return
         end
         lengths = parse_lengths('extrude' => params['extrude'], 'zOffset' => params['zOffset'])
@@ -219,10 +224,10 @@ module BanianStudio
 
         if @mode == :edit
           unless @target && @target.valid?
-            UI.messagebox('آبجکت متن دیگر در مدل وجود ندارد.')
+            UI.messagebox("The text object no longer exists in the model.\nآبجکت متن دیگر در مدل وجود ندارد.")
             return
           end
-          model.start_operation('ویرایش متن فارسی', true)
+          model.start_operation('Edit Persian Text', true)
           begin
             @target.make_unique if @target.definition.count_used_instances > 1 && !data['editAll']
             Builder.fill(@target.definition, params, polys)
@@ -233,7 +238,7 @@ module BanianStudio
           end
           @dialog.close if @dialog && !params['keepOpen']
         else
-          model.start_operation('متن فارسی', true)
+          model.start_operation('Persian Text', true)
           begin
             defn = Builder.create_definition(model, params, polys)
             model.commit_operation
@@ -248,11 +253,11 @@ module BanianStudio
       end
 
       def on_browse_font
-        path = UI.openpanel('انتخاب فایل فونت', '', 'Font Files|*.ttf;*.otf;*.ttc;*.otc||')
+        path = UI.openpanel('Select font file', '', 'Font Files|*.ttf;*.otf;*.ttc;*.otc||')
         return unless path
         faces = Fonts.parse_file(path).map { |f| f.merge('path' => path, 'custom' => true) }
         if faces.empty?
-          UI.messagebox('این فایل فونت قابل خواندن نیست.')
+          UI.messagebox("This font file could not be read.\nاین فایل فونت قابل خواندن نیست.")
           return
         end
         list = (custom_fonts.reject { |f| f['path'] == path } + faces)
@@ -268,7 +273,7 @@ module BanianStudio
           @target = inst
           push_mode
         else
-          send_js('onError', 'message' => 'یک متن فارسی (ساخته‌شده با همین پلاگین) را انتخاب کنید.')
+          send_js('onError', 'message' => 'یک متن ساخته‌شده با همین پلاگین را انتخاب کنید / Select a text created with Persian Text.')
         end
       end
 

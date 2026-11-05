@@ -95,24 +95,63 @@
     return t ? t.substr(0, 30) : 'متن نمونه فارسی';
   }
 
+  // Virtualised font list: only the rows in view are in the DOM, so the
+  // browser only has to load the handful of fonts used by visible samples.
+  var ROW = 32;
+  var view = { list: [], a: -1, b: -1, sample: null };
+
   function renderFontList() {
     var q = $('fontSearch').value.trim().toLowerCase();
     var only = $('onlyPersian').checked;
+    var list = [];
+    for (var i = 0; i < S.families.length; i++) {
+      var fam = S.families[i];
+      if (only && !fam.fa) continue;
+      if (q && fam.name.toLowerCase().indexOf(q) < 0) continue;
+      list.push(i);
+    }
+    view.list = list;
+    $('fontInner').style.height = (list.length * ROW) + 'px';
+    $('fontCount').textContent = S.fonts.length ? list.length + ' / ' + S.families.length : '';
+    drawRows(true);
+  }
+
+  function scrollToSelected() {
     var box = $('fontList');
-    var html = [], sample = escapeHtml(sampleText());
-    var count = 0;
-    S.families.forEach(function (fam, i) {
-      if (only && !fam.fa) return;
-      if (q && fam.name.toLowerCase().indexOf(q) < 0) return;
-      count++;
+    for (var k = 0; k < view.list.length; k++) {
+      if (S.families[view.list[k]].name === S.familyName) {
+        var top = k * ROW;
+        if (top < box.scrollTop || top + ROW > box.scrollTop + box.clientHeight) box.scrollTop = Math.max(0, top - box.clientHeight / 2);
+        break;
+      }
+    }
+    drawRows(true);
+  }
+
+  function drawRows(force) {
+    var box = $('fontList'), inner = $('fontInner');
+    var n = view.list.length;
+    if (!n) {
+      inner.innerHTML = '<div class="empty">' + (S.fonts.length ? 'فونتی پیدا نشد / No fonts found' : 'در حال خواندن فونت‌ها… / Loading fonts…') + '</div>';
+      view.a = view.b = -1;
+      return;
+    }
+    var h = box.clientHeight || 190;
+    var a = Math.max(0, Math.floor(box.scrollTop / ROW) - 2);
+    var b = Math.min(n, Math.ceil((box.scrollTop + h) / ROW) + 2);
+    var showS = $('showSamples').checked;
+    var sample = showS ? escapeHtml(sampleText()) : '';
+    if (!force && a === view.a && b === view.b && sample === view.sample) return;
+    view.a = a; view.b = b; view.sample = sample;
+    var html = [];
+    for (var k = a; k < b; k++) {
+      var i = view.list[k], fam = S.families[i];
       var sel = fam.name === S.familyName ? ' sel' : '';
-      html.push('<div class="font-item' + sel + '" data-i="' + i + '">' +
+      html.push('<div class="font-item' + sel + '" data-i="' + i + '" style="top:' + (k * ROW) + 'px">' +
         '<span class="fname">' + escapeHtml(fam.name) + (fam.faces.length > 1 ? ' <span class="tag">(' + fam.faces.length + ')</span>' : '') + '</span>' +
-        '<span class="fsample" style="font-family:\'' + escapeAttr(fam.name) + '\', serif">' + sample + '</span></div>');
-    });
-    box.innerHTML = count ? html.join('') : '<div class="empty">' + (S.fonts.length ? 'فونتی پیدا نشد' : 'در حال خواندن فونت‌ها…') + '</div>';
-    var selEl = box.querySelector('.sel');
-    if (selEl && selEl.scrollIntoView && !box._userScrolled) selEl.scrollIntoView({ block: 'nearest' });
+        (showS ? '<span class="fsample" style="font-family:\'' + escapeAttr(fam.name) + '\', serif">' + sample + '</span>' : '') + '</div>');
+    }
+    inner.innerHTML = html.join('');
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -139,7 +178,7 @@
     });
     sel.value = pick;
     $('text').style.fontFamily = "'" + escapeAttr(name) + "', Tahoma";
-    renderFontList();
+    drawRows(true);
     selectFace(fam.faces[pick]);
   }
 
@@ -152,9 +191,9 @@
   function loadFace(face) {
     var key = faceKey(face);
     if (S.fontCache[key]) return Promise.resolve(S.fontCache[key]);
-    setStatus('در حال بارگذاری فونت ' + face.family + '…');
+    setStatus('در حال بارگذاری فونت / Loading font: ' + face.family + '…');
     return call('getFont', { path: face.path }).then(function (res) {
-      if (!res || res.error || !res.b64) throw new Error((res && res.error) || 'خواندن فونت ممکن نشد');
+      if (!res || res.error || !res.b64) throw new Error((res && res.error) || 'خواندن فونت ممکن نشد / Could not read font');
       var bin = atob(res.b64), bytes = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       var f = PTEngine.loadFont(bytes, face.index || 0);
@@ -172,7 +211,7 @@
   function renderAxes(font) {
     var box = $('axes');
     var axes = font.axes || {};
-    var names = { wght: 'وزن (ضخامت)', wdth: 'عرض', slnt: 'شیب', ital: 'ایتالیک', opsz: 'اندازه‌ی اپتیکال' };
+    var names = { wght: 'وزن / Weight', wdth: 'عرض / Width', slnt: 'شیب / Slant', ital: 'ایتالیک / Italic', opsz: 'اندازه‌ی اپتیکال / Optical size' };
     var keys = Object.keys(axes);
     var sig = keys.join(',') + '|' + S.fontKey;
     if (box._sig === sig) return;
@@ -284,8 +323,8 @@
       if (f.path && p.fontPath && f.path.toLowerCase() === p.fontPath.toLowerCase() && (f.index || 0) === (p.fontIndex || 0)) byPath = f;
     });
     if (byPath) { selectFamily(byPath.family, faceKey(byPath)); }
-    else if ((fam = findFamily(p.family))) { selectFamily(fam.name, p.style); setStatus('فایل فونت قبلی پیدا نشد؛ از فونت هم‌نام استفاده شد.', 'warn'); }
-    else { setStatus('فونت «' + p.family + '» روی این سیستم نصب نیست. یک فونت دیگر انتخاب کنید.', 'warn'); }
+    else if ((fam = findFamily(p.family))) { selectFamily(fam.name, p.style); setStatus('فایل فونت قبلی پیدا نشد؛ از فونت هم‌نام استفاده شد. / Original font file not found; using the same family.', 'warn'); }
+    else { setStatus('فونت «' + p.family + '» نصب نیست. یک فونت دیگر انتخاب کنید. / Font "' + p.family + '" is not installed; pick another font.', 'warn'); }
     var vars = p.variations ? JSON.parse(JSON.stringify(p.variations)) : {};
     S.variations = vars;
     $('axes')._sig = null;
@@ -304,7 +343,7 @@
   function renderMaterials(list) {
     S.materials = list || [];
     var sel = $('material'), cur = sel.value;
-    var html = '<option value="">بدون متریال (پیش‌فرض)</option><option value="__color">رنگ دلخواه ←</option>';
+    var html = '<option value="">بدون متریال / Default</option><option value="__color">رنگ دلخواه / Custom color ←</option>';
     S.materials.forEach(function (m) {
       html += '<option value="' + escapeHtml(m.name) + '">' + escapeHtml(m.display || m.name) + '</option>';
     });
@@ -315,10 +354,37 @@
   // ---------------------------------------------------------------------------
   // Update pipeline
   // ---------------------------------------------------------------------------
-  var timer = null, running = false, again = false;
-  function schedule() {
+  var timer = null, running = false, again = false, lastSig = '';
+  function schedule(delay) {
     if (timer) clearTimeout(timer);
-    timer = setTimeout(update, 120);
+    timer = setTimeout(update, delay == null ? 200 : delay);
+  }
+
+  // Loads the font and parses lengths; resolves with the inputs for layout.
+  function prepare() {
+    var p = collectParams();
+    var face = S.face;
+    var lens = [p.height || '0', p.arc, p.extrude, p.zOffset];
+    return loadFace(face).then(function (font) {
+      S.font = font; S.fontKey = faceKey(face);
+      renderAxes(font);
+      return ensureLengths(lens);
+    }).then(function () {
+      var h = lengthOf('height'); var arc = lengthOf('arc'); lengthOf('extrude'); lengthOf('zOffset');
+      if (!h || h <= 0) { $('height').classList.add('invalid'); throw new Error('ارتفاع معتبر نیست / Invalid height'); }
+      return { p: p, h: h, arc: arc || 0 };
+    });
+  }
+
+  function runLayout(x, quality) {
+    var p = x.p;
+    return PTEngine.layout(S.font, {
+      text: p.text, baseDir: p.baseDir, align: p.align,
+      lineSpacing: p.lineSpacing, wordSpacing: p.wordSpacing / 100, letterSpacing: p.letterSpacing / 100,
+      variations: S.variations, persianDigits: p.persianDigits,
+      slant: p.slant, bold: p.bold / 100, quality: quality,
+      heightIn: x.h, heightMode: p.heightMode, arcIn: x.arc, minSegIn: 0.0015
+    });
   }
 
   function update() {
@@ -326,42 +392,37 @@
     if (!S.ready || !S.face) return;
     if (running) { again = true; return; }
     running = true;
-    var p = collectParams();
-    var face = S.face;
-    var lens = [p.height || '0', p.arc, p.extrude, p.zOffset];
-    loadFace(face).then(function (font) {
-      S.font = font; S.fontKey = faceKey(face);
-      renderAxes(font);
-      return ensureLengths(lens);
-    }).then(function () {
-      var h = lengthOf('height'); var arc = lengthOf('arc'); lengthOf('extrude'); lengthOf('zOffset');
-      if (!h || h <= 0) { $('height').classList.add('invalid'); throw new Error('ارتفاع معتبر نیست'); }
-      var res = PTEngine.layout(S.font, {
-        text: p.text, baseDir: p.baseDir, align: p.align,
-        lineSpacing: p.lineSpacing, wordSpacing: p.wordSpacing / 100, letterSpacing: p.letterSpacing / 100,
-        variations: S.variations, persianDigits: p.persianDigits,
-        slant: p.slant, bold: p.bold / 100, quality: p.quality,
-        heightIn: h, heightMode: p.heightMode, arcIn: arc || 0, minSegIn: 0.0015
-      });
-      S.result = res;
+    prepare().then(function (x) {
+      $('btnBuild').disabled = !x.p.text.trim();
+      if (!$('livePreview').checked) {
+        $('preview').innerHTML = '<div class="empty">پیش‌نمایش خاموش است / Preview is off</div>';
+        $('dims').textContent = '';
+        lastSig = '';
+        return;
+      }
+      // skip work when nothing that affects the shape has changed
+      var sig = JSON.stringify([x.p, x.h, x.arc, S.fontKey, S.variations]);
+      if (sig === lastSig) return;
+      lastSig = sig;
+      // preview never needs more than medium quality; "Create" redoes it at full quality
+      var res = runLayout(x, x.p.quality === 'high' ? 'medium' : x.p.quality);
       renderPreview(res);
       if (res.missing && res.missing.length) {
         var uniq = res.missing.filter(function (c, i, a) { return a.indexOf(c) === i; }).join(' ');
-        setStatus('این فونت برخی از حروف را ندارد: ' + uniq, 'warn');
-      } else if ($('status').className.indexOf('error') >= 0 || /بارگذاری|معتبر/.test($('status').textContent)) setStatus('');
-      $('btnBuild').disabled = !res.polys.length;
+        setStatus('این فونت برخی از حروف را ندارد / This font is missing: ' + uniq, 'warn');
+      } else if ($('status').className.indexOf('error') >= 0 || /Loading|Invalid/.test($('status').textContent)) setStatus('');
     }).catch(function (e) {
       setStatus(e && e.message ? e.message : String(e), 'error');
       $('btnBuild').disabled = true;
     }).then(function () {
       running = false;
-      if (again) { again = false; schedule(); }
+      if (again) { again = false; schedule(0); }
     });
   }
 
   function renderPreview(res) {
     var box = $('preview');
-    if (!res || !res.polys.length) { box.innerHTML = '<div class="empty">متنی برای نمایش نیست</div>'; $('dims').textContent = ''; return; }
+    if (!res || !res.polys.length) { box.innerHTML = '<div class="empty">متنی برای نمایش نیست / Nothing to preview</div>'; $('dims').textContent = ''; return; }
     var b = res.bbox, w = b[2] - b[0], h = b[3] - b[1];
     var pad = Math.max(w, h) * 0.06;
     var d = [];
@@ -378,7 +439,7 @@
       '<path d="' + d.join('') + '" fill="' + fill + '" fill-rule="evenodd" stroke="' + stroke + '" stroke-width="' + (Math.max(w, h) / 700) + '" vector-effect="non-scaling-stroke"/>' +
       '<g stroke="#e53935" stroke-width="' + (mk / 5) + '"><line x1="' + (-mk) + '" y1="0" x2="' + mk + '" y2="0"/><line x1="0" y1="' + (-mk) + '" x2="0" y2="' + mk + '"/></g>' +
       '</svg>';
-    $('dims').textContent = 'عرض ' + fmtLen(w) + '  ×  ارتفاع ' + fmtLen(h);
+    $('dims').textContent = 'W ' + fmtLen(w) + '  ×  H ' + fmtLen(h);
   }
 
   function materialColor() {
@@ -392,24 +453,39 @@
   // Build
   // ---------------------------------------------------------------------------
   function build() {
-    if (!S.result || !S.result.polys.length) return;
-    var p = collectParams();
-    p.heightIn = lengthOf('height');
-    send('build', { params: p, polys: S.result.polys, editAll: $('editAll').checked });
+    if (!S.ready || !S.face || $('btnBuild').disabled) return;
+    $('btnBuild').disabled = true;
+    prepare().then(function (x) {
+      var res = runLayout(x, x.p.quality);
+      if (!res.polys.length) throw new Error('متنی برای ساخت نیست / Nothing to create');
+      x.p.heightIn = x.h;
+      send('build', { params: x.p, polys: res.polys, editAll: $('editAll').checked });
+    }).catch(function (e) {
+      setStatus(e && e.message ? e.message : String(e), 'error');
+    }).then(function () { $('btnBuild').disabled = false; });
   }
 
   // ---------------------------------------------------------------------------
   // Messages from Ruby
   // ---------------------------------------------------------------------------
+  function showUnits() {
+    var u = (UNIT[S.units] || UNIT[3])[1];
+    var els = document.querySelectorAll('.unit');
+    for (var i = 0; i < els.length; i++) els[i].textContent = u;
+    $('unitHint').innerHTML = 'اعداد بدون واحد = واحد مدل (' + u + ')؛ می‌توانید 5mm ،2m یا "3 هم بنویسید.' +
+      '<br><span class="en">Plain numbers use the model unit (' + u + '). You can also type 5mm, 2m or 3".</span>';
+  }
+
   PT.onInit = function (o) {
     S.units = o.units;
+    showUnits();
     renderMaterials(o.materials);
     if (o.settings && Object.keys(o.settings).length) {
       var st = JSON.parse(JSON.stringify(o.settings));
       delete st.text;
       applyParams(st);
     } else {
-      $('height').value = (o.units === 0 || o.units === 1) ? '12"' : '30cm';
+      $('height').value = { 0: '12', 1: '1', 2: '300', 3: '30', 4: '0.3', 5: '0.33' }[o.units] || '30';
     }
   };
 
@@ -426,14 +502,16 @@
       if (fam) selectFamily(fam.name);
     }
     renderFontList();
+    scrollToSelected();
+    if (/Rescan|بازخوانی/.test($('status').textContent)) setStatus('');
   };
 
   PT.onMode = function (o) {
     S.mode = o.mode;
     if (o.materials) renderMaterials(o.materials);
     var edit = o.mode === 'edit';
-    $('modeTitle').textContent = edit ? 'ویرایش متن فارسی' : 'متن فارسی جدید';
-    $('btnBuild').textContent = edit ? 'اعمال تغییرات' : 'ساخت و قرار دادن';
+    $('modeTitle').innerHTML = edit ? 'ویرایش متن فارسی <span class="en">Edit Persian Text</span>' : 'متن فارسی جدید <span class="en">New Persian Text</span>';
+    $('btnBuild').innerHTML = edit ? 'اعمال تغییرات <span class="en">Apply</span>' : 'ساخت و قرار دادن <span class="en">Create &amp; place</span>';
     $('editAllWrap').hidden = !(edit && o.shared);
     if (edit && o.params) applyParams(o.params);
     schedule();
@@ -461,7 +539,15 @@
     ['text', 'height', 'arc', 'extrude', 'zOffset'].forEach(function (id) {
       $(id).addEventListener('input', schedule);
     });
-    $('text').addEventListener('input', function () { clearTimeout(wire._t); wire._t = setTimeout(renderFontList, 400); });
+    $('text').addEventListener('input', function () { clearTimeout(wire._t); wire._t = setTimeout(function () { drawRows(false); }, 400); });
+    var rafPending = false;
+    $('fontList').addEventListener('scroll', function () {
+      if (rafPending) return;
+      rafPending = true;
+      (window.requestAnimationFrame || setTimeout)(function () { rafPending = false; drawRows(false); });
+    });
+    $('showSamples').addEventListener('change', function () { drawRows(true); });
+    $('livePreview').addEventListener('change', function () { schedule(0); });
     ['heightMode', 'baseDir', 'quality', 'persianDigits', 'smooth', 'material', 'color'].forEach(function (id) {
       $(id).addEventListener('change', schedule);
     });
@@ -488,7 +574,7 @@
       var fam = findFamily(S.familyName);
       if (fam) selectFace(fam.faces[+this.value]);
     });
-    $('btnRescan').addEventListener('click', function () { setStatus('در حال بازخوانی فونت‌ها…'); send('rescanFonts'); });
+    $('btnRescan').addEventListener('click', function () { setStatus('در حال بازخوانی فونت‌ها… / Rescanning fonts…'); send('rescanFonts'); });
     $('btnBrowse').addEventListener('click', function () { send('browseFont'); });
     $('btnPick').addEventListener('click', function () { send('pickSelection'); });
     $('btnCancel').addEventListener('click', function () { send('close'); });
@@ -502,16 +588,30 @@
     updateOutputs();
   }
 
+  // opentype.js is only needed when WebAssembly is missing (SketchUp 2017/2018)
+  function loadFallback() {
+    if (typeof window.WebAssembly === 'object' || window.opentype) return Promise.resolve();
+    return new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = 'lib/opentype.min.js';
+      s.onload = s.onerror = function () { resolve(); };
+      document.body.appendChild(s);
+    });
+  }
+
   function start() {
     wire();
-    PTEngine.init(window.PT_HB_WASM_B64).then(function (backend) {
+    showUnits();
+    loadFallback().then(function () {
+      return PTEngine.init(window.PT_HB_WASM_B64);
+    }).then(function (backend) {
       var b = $('backend');
-      if (backend === 'harfbuzz') { b.textContent = 'موتور HarfBuzz'; b.className = 'badge ok'; }
-      else { b.textContent = 'موتور سازگار (نسخه‌ی قدیمی اسکچ‌آپ)'; b.className = 'badge warn'; }
+      if (backend === 'harfbuzz') { b.textContent = 'HarfBuzz'; b.className = 'badge ok'; }
+      else { b.textContent = 'Compatibility engine (old SketchUp)'; b.className = 'badge warn'; }
       S.ready = true;
       send('ready');
     }).catch(function (e) {
-      setStatus('موتور متن بارگذاری نشد: ' + (e && e.message), 'error');
+      setStatus('موتور متن بارگذاری نشد / Text engine failed to load: ' + (e && e.message), 'error');
     });
   }
 

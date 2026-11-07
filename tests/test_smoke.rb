@@ -11,7 +11,7 @@ module BanianStudio
     VERSION = 'test'.freeze
   end
 end
-%w[core/geom2d core/patterns core/params core/region core/materials core/builder ui/dialog].each { |f| require File.join(ROOT, f) }
+%w[core/geom2d core/patterns core/params core/region core/surface core/materials core/builder ui/dialog].each { |f| require File.join(ROOT, f) }
 
 FS = BanianStudio::FloorStudio
 

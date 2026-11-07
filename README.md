@@ -10,7 +10,7 @@
 - بدون کندی: موتور اصلی فقط با اولین استفاده بارگذاری می‌شود؛ کاشی‌های تکراری به‌صورت Component ساخته می‌شوند (فایل سبک)
 
 ## نصب
-1. فایل `dist/banian_floor_studio_v1.1.0.rbz` را دانلود کنید.
+1. فایل `dist/banian_floor_studio_v1.2.0.rbz` را دانلود کنید.
 2. در اسکچ‌آپ: `Extensions > Extension Manager > Install Extension` و فایل را انتخاب کنید.
 3. از منوی `Extensions > Banian Floor Studio` یا نوار ابزار استفاده کنید.
 
@@ -29,6 +29,8 @@ Hopscotch (لی‌لی / پین‌ویل)، Stone (سنگ نامنظم Voronoi)�
 ## امکانات
 - سطوح **نامنظم و سوراخ‌دار** (ستون، داکت…)؛ کاشی‌ها دقیق برش می‌خورند و لبه‌های کارخانه‌ای پروفیل خود را حفظ می‌کنند
 - کف، **دیوار** و سقف (هر سطحی با هر زاویه)
+- **سطوح منحنی** (دیوار نیم‌دایره، قوس، استوانه…): کل سطح (وجه‌های متصل با لبه‌های soft/smooth/hidden) یکجا شناخته می‌شود، دقیق باز (unroll) می‌شود تا ابعاد واقعی حفظ شود، و کاشی‌ها **تخت** و منطبق بر انحنا روی آن قرار می‌گیرند؛ بندکشی، تقسیم سطح و تکسچر هم انحنا را دنبال می‌کنند
+- چند سطح هم‌صفحه کنار هم به‌صورت **یک ناحیه پیوسته** کاشی می‌شوند
 - **نقطه شروع دلخواه**: با کلیک/کشیدن روی پیش‌نمایش (با گیرکردن به گوشه‌ها) یا با «Pick in model» روی خود مدل؛ انتخاب اینکه درز کاشی یا وسط کاشی روی نقطه بیفتد
 - چرخش، نقطه شروع آماده (گوشه / وسط‌چین / مبدأ جهانی برای پیوستگی بین چند سطح)، جهت (بلندترین لبه / محورها)، جابه‌جایی X/Y
 - پروفیل لبه: Square، Chamfer، Round، Bullnose، Cove، Ogee
@@ -47,10 +49,15 @@ Generate real 3D tiles, parquet, herringbone, chevron, basket weave, hexagon, ho
 face (floors, walls, ceilings) — or just **divide a face** into the pattern. SketchUp 2017–2027, Windows & macOS,
 Persian/English UI.
 
-**Install:** `Extensions > Extension Manager > Install Extension` → `dist/banian_floor_studio_v1.1.0.rbz`.
+**Install:** `Extensions > Extension Manager > Install Extension` → `dist/banian_floor_studio_v1.2.0.rbz`.
 
 **Use:** select one or more faces → `Extensions > Banian Floor Studio` (or the toolbar / right-click menu) →
 pick a mode and pattern → Generate. Set a custom start point by clicking/dragging on the preview or with **Pick in model**. Select a generated group to edit it later.
+
+### Curved surfaces
+Faces joined by soft/smooth/hidden edges are treated as one surface, unrolled isometrically into 2D (true
+dimensions), patterned, and mapped back: tiles stay flat and are placed tangent to the curve without ever
+sinking into it. Grout, Divide and Texture follow the curve too. Coplanar neighbouring faces merge into one region.
 
 ### Performance design
 - Lazy loading: only menus are registered at startup.
@@ -68,5 +75,5 @@ tests/                            pure-Ruby tests + mocked SketchUp smoke test
 tools/build_rbz.sh                builds dist/*.rbz
 ```
 ```bash
-ruby tests/test_patterns.rb && ruby tests/test_smoke.rb && tools/build_rbz.sh
+ruby tests/test_patterns.rb && ruby tests/test_smoke.rb && ruby tests/test_curved.rb && tools/build_rbz.sh
 ```

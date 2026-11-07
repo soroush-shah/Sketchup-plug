@@ -275,3 +275,93 @@ module UI
   def self.beep; end
   def self.messagebox(m); puts "MSG: #{m}"; end
 end
+
+# ---- topology support (shared vertices / edges) for curved-surface tests ----
+module Geom
+  class Transformation
+    alias_method :__init_orig, :initialize
+    def initialize(arg = nil)
+      if arg.is_a?(Array) && arg.length == 16
+        a = arg
+        @m = [[a[0], a[4], a[8], a[12]], [a[1], a[5], a[9], a[13]], [a[2], a[6], a[10], a[14]]]
+      else
+        __init_orig(arg)
+      end
+    end
+    def to_a
+      [@m[0][0], @m[1][0], @m[2][0], 0.0, @m[0][1], @m[1][1], @m[2][1], 0.0,
+       @m[0][2], @m[1][2], @m[2][2], 0.0, @m[0][3], @m[1][3], @m[2][3], 1.0]
+    end
+  end
+end
+
+module Sketchup
+  class Vertex
+    def edges; @edges ||= []; end
+    def common_edge(o); edges.find { |e| e.start == o || e.end == o }; end
+  end
+
+  class Edge
+    attr_accessor :start, :end, :hidden_flag
+    def soft?; !!@soft; end
+    def smooth?; !!@smooth; end
+    def hidden?; !!@hidden_flag; end
+    def faces; @faces ||= []; end
+    def reversed_in?(f)
+      vs = f.topo_vertices
+      n = vs.length
+      n.times { |i| return false if vs[i] == @start && vs[(i + 1) % n] == @end }
+      true
+    end
+  end
+
+  class Face
+    attr_reader :topo_vertices
+    def set_topo(vs, edges); @topo_vertices = vs; @topo_edges = edges; end
+    alias_method :__edges_orig, :outer_loop
+    def edges; @topo_edges || outer_loop.edges; end
+    def loops
+      return [Loop.new(@pts, true)] + @holes.map { |h| Loop.new(h, false) } unless @topo_vertices
+      [TopoLoop.new(@topo_vertices)]
+    end
+    def vertices; @topo_vertices || outer_loop.vertices; end
+  end
+
+  class TopoLoop
+    def initialize(vs); @vs = vs; end
+    def vertices; @vs; end
+    def outer?; true; end
+  end
+
+  module Topo
+    # pts: array of [x,y,z]; polys: arrays of indices; soft: mark inner edges soft
+    def self.build(ents, pts, polys, soft = true)
+      vs = pts.map { |p| Vertex.new(Geom::Point3d.new(*p)) }
+      emap = {}
+      faces = polys.map do |idx|
+        fv = idx.map { |i| vs[i] }
+        f = Face.new(fv.map(&:position))
+        es = []
+        fv.each_with_index do |a, k|
+          b = fv[(k + 1) % fv.length]
+          key = [a.object_id, b.object_id].sort
+          e = emap[key]
+          unless e
+            e = Edge.new(a.position, b.position)
+            e.start = a
+            e.end = b
+            a.edges << e
+            b.edges << e
+            emap[key] = e
+          end
+          e.faces << f
+          es << e
+        end
+        f.set_topo(fv, es)
+        ents.add(f)
+      end
+      emap.each_value { |e| e.soft = e.smooth = soft if e.faces.length > 1 }
+      faces
+    end
+  end
+end

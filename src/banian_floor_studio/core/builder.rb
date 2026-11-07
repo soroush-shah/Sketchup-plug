@@ -152,8 +152,13 @@ module BanianStudio
       end
 
       def placement(t, ctx, rng)
-        tr = Geom::Transformation.new(Geom::Point3d.new(t.cx, t.cy, 0)) *
-             Geom::Transformation.rotation(ORIGIN, Z_AXIS, t.ang)
+        tr =
+          if ctx[:surface]
+            ctx[:surface].tile_frame(t)
+          else
+            Geom::Transformation.new(Geom::Point3d.new(t.cx, t.cy, 0)) *
+              Geom::Transformation.rotation(ORIGIN, Z_AXIS, t.ang)
+          end
         if t.tilt.to_f.abs > 1.0e-6
           hy = 0.0
           t.shape.each { |q| hy = q[1] if q[1] < hy }
@@ -251,7 +256,7 @@ module BanianStudio
 
       # ---------------------------------------------------------------
       # 3D tiles. Returns stats hash.
-      def build_3d(model, ents, lay, region, p)
+      def build_3d(model, ents, lay, region, p, surf = nil)
         tiles = lay[:tiles]
         mats, vars = material_ctx(model, p, tiles)
         t = [p[:thickness].to_f, 0.0].max
@@ -259,7 +264,8 @@ module BanianStudio
           :thickness => t,
           :profile => profile_pts(p[:profile], t, p[:profile_size]),
           :curved => curved?(p[:profile]),
-          :imp_angle => p[:imp_angle].to_f, :imp_height => p[:imp_height].to_f
+          :imp_angle => p[:imp_angle].to_f, :imp_height => p[:imp_height].to_f,
+          :surface => surf
         }
         rng = Random.new(p[:seed] * 101 + 3)
         full = tiles.select { |x| x.state == :inside }
@@ -314,11 +320,16 @@ module BanianStudio
           zg = 0.0 if zg < 0
           gg = ents.add_group
           gg.name = 'Grout'
-          gf = add_region_face(gg.entities, region, zg)
-          if gf
-            gm = Materials.grout(model, p)
-            gf.material = gm
-            gf.back_material = gm
+          gm = Materials.grout(model, p)
+          if surf
+            surf.grout(gg.entities, zg, gm)
+            soften(gg.entities)
+          else
+            gf = add_region_face(gg.entities, region, zg)
+            if gf
+              gf.material = gm
+              gf.back_material = gm
+            end
           end
         end
         { 'full' => full.length, 'cut' => npieces, 'defs' => defs.length }
@@ -398,6 +409,81 @@ module BanianStudio
           'faces' => newf.length }
       end
 
+      # Divide a curved / multi-face surface: pattern lines are cut per facet
+      # in the unrolled 2D space and mapped back onto each facet.
+      def divide_surface(model, ents, surf, lay, region, p)
+        tiles = lay[:tiles]
+        idx = lay[:index]
+        gap = p[:gap] > 1.0e-6
+        segs = {}
+        tiles.each do |t|
+          poly = t.poly
+          n = poly.length
+          n.times do |i|
+            a = poly[i]
+            b = poly[(i + 1) % n]
+            list = t.state == :inside ? [[a, b]] : Geom2D.clip_segment_region(a, b, region, idx)
+            list.each do |sg|
+              next if Math.hypot(sg[1][0] - sg[0][0], sg[1][1] - sg[0][1]) < 1.0e-4
+              segs[seg_key(sg, gap)] ||= sg
+            end
+          end
+        end
+        fidx = {}
+        surf.facets.each do |f|
+          fidx[f] = Geom2D::SegmentIndex.new(Geom2D.region_segments(:outer => f.outer, :holes => f.holes),
+                                             [f.bb[2] - f.bb[0], f.bb[3] - f.bb[1], 1.0].max)
+        end
+        before = {}
+        ents.grep(Sketchup::Face).each { |f| before[f.entityID] = true }
+        temp = ents.add_group
+        te = temp.entities
+        count = 0
+        segs.each_value do |sg|
+          sb = Geom2D.bbox(sg)
+          surf.facets.each do |f|
+            next unless Geom2D.bbox_overlap?(sb, f.bb)
+            Geom2D.clip_segment_region(sg[0], sg[1], { :outer => f.outer, :holes => f.holes }, fidx[f]).each do |q|
+              next if Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) < 1.0e-4
+              te.add_line(surf.to3d(q[0], f), surf.to3d(q[1], f))
+              count += 1
+            end
+          end
+        end
+        temp.explode
+        newf = ents.grep(Sketchup::Face).reject { |f| before[f.entityID] }
+        surf.facets.each { |f| newf << f.face if f.face && f.face.valid? }
+        paint_surface(model, newf, surf, tiles, p) if p[:paint] || p[:paint_grout]
+        { 'full' => tiles.count { |t| t.state == :inside }, 'cut' => tiles.count { |t| t.state == :boundary },
+          'faces' => newf.length, 'lines' => count }
+      end
+
+      def paint_surface(model, faces, surf, tiles, p)
+        mats, vars = material_ctx(model, p, tiles)
+        gm = p[:paint_grout] && p[:gap] > 1.0e-6 ? Materials.grout(model, p) : nil
+        cell = Math.sqrt(Geom2D.area(tiles.first.poly)) * 1.5
+        tidx = TileIndex.new(tiles, cell)
+        faces.each do |f|
+          next unless f.valid?
+          tri = f.mesh(0).polygon_points_at(1)
+          c = Geom::Point3d.new((tri[0].x + tri[1].x + tri[2].x) / 3.0, (tri[0].y + tri[1].y + tri[2].y) / 3.0,
+                                (tri[0].z + tri[1].z + tri[2].z) / 3.0)
+          fc = surf.facet_for_3d(c)
+          next unless fc
+          front = f.normal.dot(fc.normal) >= 0
+          q = c.transform(fc.xf)
+          t = tidx.find([q.x.to_f, q.y.to_f])
+          m = t ? (p[:paint] ? mats[t.mat] : nil) : gm
+          next unless m
+          if front
+            f.material = m
+          else
+            f.back_material = m
+          end
+          Materials.map_uv(f, m, t.cx, t.cy, t.ang, vars[t.variant], front, fc.inv) if t && m.texture
+        end
+      end
+
       def seg_key(s, gap)
         a = s[0].map { |v| (v * 1000).round }
         b = s[1].map { |v| (v * 1000).round }
@@ -465,7 +551,12 @@ module BanianStudio
         mat
       end
 
-      def store(group, region, ui_params, mode)
+      def store(group, region, ui_params, mode, surf = nil)
+        if surf
+          group.set_attribute(DICT, 'surface', JSON.generate(surf.to_h))
+        elsif group.get_attribute(DICT, 'surface')
+          group.delete_attribute(DICT, 'surface')
+        end
         group.set_attribute(DICT, 'version', VERSION_TAG)
         group.set_attribute(DICT, 'mode', mode)
         group.set_attribute(DICT, 'params', JSON.generate(ui_params))

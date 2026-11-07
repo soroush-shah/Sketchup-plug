@@ -4,7 +4,7 @@ require 'json'
 require_relative '../tests/mock_sketchup'
 ROOT = File.expand_path('../src/banian_floor_studio', __dir__)
 module BanianStudio; module FloorStudio; PATH = ROOT; VERSION = '1.0.0'; end; end
-%w[core/geom2d core/patterns core/params core/region core/materials core/builder ui/dialog].each { |f| require File.join(ROOT, f) }
+%w[core/geom2d core/patterns core/params core/region core/surface core/materials core/builder ui/dialog].each { |f| require File.join(ROOT, f) }
 FS = BanianStudio::FloorStudio
 class D; attr_reader :m; def initialize; @m = []; end; def execute_script(s); @m << JSON.parse(s[8..-2]); end; def visible?; true; end; end
 d = D.new

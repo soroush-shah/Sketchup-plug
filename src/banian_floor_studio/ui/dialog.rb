@@ -179,18 +179,59 @@ module BanianStudio
 
       def source(p)
         g = edit_target
-        if g
-          reg = Region.from_json_h(JSON.parse(g.get_attribute(Builder::DICT, 'region')))
-          wo = ORIGIN.transform(g.transformation.inverse)
-          return { :kind => 'group', :group => g, :region => reg, :world_origin => [wo.x.to_f, wo.y.to_f],
-                   :frame => g.transformation }
-        end
+        return group_source(g) if g
         faces = model.selection.grep(Sketchup::Face)
         unless faces.empty?
-          s = Region.from_face(faces.first, p)
-          return s.merge(:kind => 'face', :faces => faces)
+          list = sources(faces, p)
+          return list.first.merge(:count => faces.length, :nsrc => list.length)
         end
         { :kind => 'none', :region => Region.sample, :world_origin => [0, 0], :frame => Geom::Transformation.new }
+      end
+
+      # Selected faces -> work units. Faces joined by soft/smooth/hidden edges
+      # (curved surfaces) or coplanar neighbours become ONE unrolled surface.
+      def sources(faces, p)
+        Surface.components(faces).map do |comp|
+          if comp.length == 1
+            Region.from_face(comp[0], p).merge(:kind => 'face', :face => comp[0], :faces => comp)
+          else
+            sf = Surface.from_faces(comp, p)
+            base = { :kind => 'face', :face => sf.root, :faces => comp, :region => sf.region,
+                     :world_origin => sf.world_origin }
+            sf.planar ? base.merge(:frame => sf.facets[0].inv) : base.merge(:surface => sf, :frame => nil)
+          end
+        end
+      end
+
+      def group_source(g)
+        reg = Region.from_json_h(JSON.parse(g.get_attribute(Builder::DICT, 'region')))
+        sj = g.get_attribute(Builder::DICT, 'surface')
+        if sj
+          sf = Surface.from_h(JSON.parse(sj), reg)
+          return { :kind => 'group', :group => g, :region => reg, :surface => sf, :gxf => g.transformation,
+                   :world_origin => sf.world_origin }
+        end
+        wo = ORIGIN.transform(g.transformation.inverse)
+        { :kind => 'group', :group => g, :region => reg, :world_origin => [wo.x.to_f, wo.y.to_f],
+          :frame => g.transformation }
+      end
+
+      # context coords <-> unrolled/local 2D for any source
+      def src_to2d(src, pt)
+        if src[:surface]
+          q = src[:gxf] ? pt.transform(src[:gxf].inverse) : pt
+          return src[:surface].to2d(q)
+        end
+        q = pt.transform(src[:frame].inverse)
+        [q.x.to_f, q.y.to_f]
+      end
+
+      def src_to3d(src, x, y)
+        if src[:surface]
+          q = src[:surface].to3d([x, y])
+          return src[:gxf] ? q.transform(src[:gxf]) : q
+        end
+        Geom::Point3d.new(x, y, 0).transform(src[:frame])
       end
 
       # Colour palette matching Builder.material_ctx ordering, without
@@ -233,16 +274,14 @@ module BanianStudio
       end
 
       # Custom start point (stored in the parent/context coords) -> local 2D.
-      def custom_local(frame, p)
+      def custom_local(src, p)
         ap = p[:anchor_pt]
-        return nil unless ap && frame
-        q = Geom::Point3d.new(ap[0], ap[1], ap[2]).transform(frame.inverse)
-        [q.x.to_f, q.y.to_f]
+        return nil unless ap
+        src_to2d(src, Geom::Point3d.new(ap[0], ap[1], ap[2]))
       end
 
-      def lay_opts(src_or_frame, p, world_origin)
-        frame = src_or_frame.is_a?(Hash) ? src_or_frame[:frame] : src_or_frame
-        { :world_origin => world_origin, :custom => custom_local(frame, p) }
+      def lay_opts(src, p, world_origin = nil)
+        { :world_origin => world_origin || src[:world_origin], :custom => custom_local(src, p) }
       end
 
       # Point picked in the model (world coords) -> active context coords.
@@ -256,7 +295,7 @@ module BanianStudio
       def on_set_anchor_local(data)
         p = Params.from_ui(data['state'] || {})
         src = source(p)
-        q = Geom::Point3d.new(data['x'].to_f / 25.4, data['y'].to_f / 25.4, 0).transform(src[:frame])
+        q = src_to3d(src, data['x'].to_f / 25.4, data['y'].to_f / 25.4)
         send_js('anchor', 'pt' => [mm(q.x.to_f), mm(q.y.to_f), mm(q.z.to_f)])
       end
 
@@ -274,7 +313,9 @@ module BanianStudio
         reg = src[:region]
         out = {
           'source' => src[:kind],
-          'count' => src[:faces] ? src[:faces].length : 0,
+          'count' => src[:count] || 0,
+          'curved' => !src[:surface].nil?,
+          'overlap' => src[:surface] ? src[:surface].overlap : false,
           'region' => { 'outer' => reg[:outer].map { |q| [mm(q[0]), mm(q[1])] },
                         'holes' => reg[:holes].map { |h| h.map { |q| [mm(q[0]), mm(q[1])] } } },
           'palette' => cols,
@@ -325,21 +366,27 @@ module BanianStudio
             stats = rebuild(g, ui)
           else
             created = []
-            faces.each_with_index do |f, i|
+            list = sources(faces, p)
+            list.each_with_index do |s, i|
+              f = s[:face]
               next unless f.valid?
-              Sketchup.status_text = "Banian Floor Studio: #{i + 1}/#{faces.length}"
-              s = Region.from_face(f, p)
-              lay = Patterns.layout(s[:region], p, lay_opts(s, p, s[:world_origin]))
+              Sketchup.status_text = "Banian Floor Studio: #{i + 1}/#{list.length}"
+              lay = Patterns.layout(s[:region], p, lay_opts(s, p))
+              ents = f.parent.entities
               r =
                 if mode == 'divide'
-                  Builder.divide(model, f, s[:frame], lay, s[:region], p)
+                  if s[:surface]
+                    Builder.divide_surface(model, ents, s[:surface], lay, s[:region], p)
+                  else
+                    Builder.divide(model, f, s[:frame], lay, s[:region], p)
+                  end
                 else
-                  grp = f.parent.entities.add_group
-                  grp.transformation = s[:frame]
+                  grp = ents.add_group
+                  grp.transformation = s[:frame] if s[:frame]
                   grp.name = "Floor Studio - #{Patterns.norm(p)[:pattern]}"
-                  rr = Builder.build_3d(model, grp.entities, lay, s[:region], p)
-                  Builder.store(grp, s[:region], ui, '3d')
-                  f.hidden = true unless p[:keep_face]
+                  rr = Builder.build_3d(model, grp.entities, lay, s[:region], p, s[:surface])
+                  Builder.store(grp, s[:region], ui, '3d', s[:surface])
+                  s[:faces].each { |ff| ff.hidden = true } unless p[:keep_face]
                   created << grp
                   rr
                 end
@@ -364,14 +411,14 @@ module BanianStudio
 
       def rebuild(g, ui)
         p = Params.from_ui(ui)
-        reg = Region.from_json_h(JSON.parse(g.get_attribute(Builder::DICT, 'region')))
-        wo = ORIGIN.transform(g.transformation.inverse)
-        lay = Patterns.layout(reg, p, lay_opts(g.transformation, p, [wo.x.to_f, wo.y.to_f]))
+        src = group_source(g)
+        reg = src[:region]
+        lay = Patterns.layout(reg, p, lay_opts(src, p))
         ents = g.respond_to?(:definition) ? g.definition.entities : g.entities
         ents.clear!
-        r = Builder.build_3d(model, ents, lay, reg, p)
+        r = Builder.build_3d(model, ents, lay, reg, p, src[:surface])
         g.name = "Floor Studio - #{Patterns.norm(p)[:pattern]}"
-        Builder.store(g, reg, ui, '3d')
+        Builder.store(g, reg, ui, '3d', src[:surface])
         Builder.purge_tile_defs(model)
         r
       end
@@ -422,9 +469,15 @@ module BanianStudio
         model.start_operation('Floor Studio Texture', true)
         begin
           mat = Builder.texture_material(model, file, w, h, name)
-          faces.each do |f|
-            s = Region.from_face(f, p)
-            Builder.map_texture(f, s[:frame], texture_origin(s, p), p[:angle], mat, w, h)
+          sources(faces, p).each do |s|
+            o = texture_origin(s, p)
+            if s[:surface]
+              s[:surface].facets.each do |fc|
+                Builder.map_texture(fc.face, fc.inv, o, p[:angle], mat, w, h) if fc.face && fc.face.valid?
+              end
+            else
+              s[:faces].each { |f| Builder.map_texture(f, s[:frame], o, p[:angle], mat, w, h) }
+            end
           end
           model.commit_operation
         rescue StandardError
@@ -437,7 +490,7 @@ module BanianStudio
 
       def texture_origin(s, p)
         np = Patterns.norm(p)
-        Patterns.origin_for(s[:region], np, lay_opts(s, p, s[:world_origin]))[0]
+        Patterns.origin_for(s[:region], np, lay_opts(s, p))[0]
       end
 
       # ---------------- state ----------------

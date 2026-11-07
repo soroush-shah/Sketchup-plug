@@ -242,6 +242,7 @@
 
   function renderSource() {
     var s = SRC.kind === 'group' ? T('src_group') : SRC.kind === 'face' ? T('src_face', { n: SRC.count }) : T('src_none');
+    if (PREV && PREV.curved && SRC.kind !== 'none') s += ' · ' + T('src_curved');
     $('#src').textContent = s;
   }
 
@@ -249,7 +250,8 @@
     var el = $('#stats');
     if (!PREV) { el.textContent = ''; return; }
     var parts = [T('st_full') + ': ' + PREV.full, T('st_cut') + ': ' + PREV.cut, T('st_area') + ': ' + PREV.area + ' m²'];
-    el.innerHTML = parts.join(' · ') + (PREV.dense ? '<br>' + T('st_dense') : '');
+    el.innerHTML = parts.join(' · ') + (PREV.dense ? '<br>' + T('st_dense') : '') +
+      (PREV.overlap ? '<br><b>' + T('warn_overlap') + '</b>' : '');
   }
 
   // ---------------- materials ----------------
@@ -431,7 +433,7 @@
         changed();
         break;
       case 'preview':
-        PREV = m; draw(); renderStats();
+        PREV = m; draw(); renderStats(); renderSource();
         break;
       case 'anchor':
         S.anchor = 'custom'; S.anchor_pt = m.pt; S.offset_x = 0; S.offset_y = 0;

@@ -6,7 +6,7 @@ module BanianStudio
   module FloorStudio
     PATH = File.dirname(__FILE__).freeze
     DICT_NAME = 'BanianFloorStudio'.freeze
-    CORE = %w[core/geom2d core/patterns core/params core/region core/materials core/builder ui/dialog].freeze
+    CORE = %w[core/geom2d core/patterns core/params core/region core/surface core/materials core/builder ui/dialog].freeze
 
     def self.load_core
       return if @core_loaded

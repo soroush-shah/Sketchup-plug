@@ -9,7 +9,7 @@
   var S = {
     lang: 'fa', units: 'mm', tab: 'member', catalog: [], presets: [], library: { profiles: [], assemblies: [] },
     materials: [], member: null, assembly: null, sel: null, qty: [], similar: false, openRow: -1,
-    search: '', preview: {}
+    search: '', preview: {}, components: [], shape: false
   };
 
   // ---------- helpers ------------------------------------------------------
@@ -63,6 +63,7 @@
     return null;
   }
   function profileName(id, fallback) {
+    if (String(id).indexOf('component:') === 0) return String(id).slice(10);
     var e = catalogEntry(id);
     if (e) return S.lang === 'fa' ? e.fa : e.en;
     var c = customEntry(id);
@@ -223,6 +224,31 @@
       g + txt + '</g>' + dim + '</svg>';
   }
 
+  var MAT_FILL = {
+    'BPB Wood': '#c9a070', 'BPB Metal': '#9aa1a8', 'BPB Dark Metal': '#3f4247', 'BPB Glass': 'rgba(120,185,220,.45)',
+    'BPB White': '#f4f2ec', 'BPB Concrete': '#b4b2ac'
+  };
+  function matFill(m, type) {
+    if (MAT_FILL[m]) return MAT_FILL[m];
+    if (m) { var h = 0; for (var i = 0; i < m.length; i++) h = (h * 31 + m.charCodeAt(i)) % 360; return 'hsl(' + h + ',35%,62%)'; }
+    return type === 'layer' ? '#7fa7e8' : '#d4b26a';
+  }
+  // Front view of an assembly: rects [x0, y0, x1, y1, type, material, hidden]
+  function elevSVG(rects, W, H, pad) {
+    if (!rects || !rects.length) return '<svg viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+    var b = [Infinity, Infinity, -Infinity, -Infinity];
+    rects.forEach(function (r) { b[0] = Math.min(b[0], r[0]); b[1] = Math.min(b[1], r[1], 0); b[2] = Math.max(b[2], r[2]); b[3] = Math.max(b[3], r[3]); });
+    var w = b[2] - b[0] || 1, h = b[3] - b[1] || 1, k = Math.min((W - 2 * pad) / w, (H - 2 * pad) / h);
+    var ox = (W - w * k) / 2, oy = (H - h * k) / 2, g = '';
+    g += '<line x1="0" x2="' + W + '" y1="' + (oy + h * k).toFixed(1) + '" y2="' + (oy + h * k).toFixed(1) + '" class="el-ground"/>';
+    rects.forEach(function (r) {
+      var x = ox + (r[0] - b[0]) * k, y = oy + (b[3] - r[3]) * k, rw = Math.max((r[2] - r[0]) * k, 0.6), rh = Math.max((r[3] - r[1]) * k, 0.6);
+      g += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + rw.toFixed(1) + '" height="' + rh.toFixed(1) +
+        '" fill="' + matFill(r[5], r[4]) + '" class="el' + (r[6] ? ' el-hidden' : '') + '"/>';
+    });
+    return '<svg class="elev" viewBox="0 0 ' + W + ' ' + H + '">' + g + '</svg>';
+  }
+
   // ---------- header / tabs / banner ---------------------------------------
   function renderChrome() {
     document.documentElement.lang = S.lang;
@@ -242,15 +268,27 @@
 
   function renderBanner() {
     var el = $('banner');
+    if (S.shape) {
+      el.className = 'banner shape';
+      el.innerHTML = '<div><b>' + esc(T('shape_title')) + '</b><br>' + esc(T('shape_help')) + '</div><div class="row-btns">' +
+        '<button class="ok" data-c="shape_done">✔ ' + esc(T('shape_done')) + '</button><button data-c="shape_cancel">' + esc(T('cancel')) + '</button></div>';
+      return;
+    }
     if (S.tab !== 'member' && S.tab !== 'assembly') { el.className = 'banner hide'; return; }
     if (editing()) {
       el.className = 'banner edit';
       var h = '<div>' + esc(T('editing').replace('{n}', S.lang === 'fa' ? nf(S.sel.count, 0) : S.sel.count)
         .replace('{k}', T('k_' + S.sel.kind))) + '</div><div class="row-btns">';
+      h += '<button data-c="edit_path">✎ ' + esc(T('edit_path')) + '</button>';
+      if (S.sel.kind === 'member') h += '<button data-c="edit_shape">◩ ' + esc(T('edit_shape')) + '</button>';
       if (S.sel.kind === 'member') h += '<button data-c="rotate">' + esc(T('rotate90')) + '</button>';
       h += '<button data-c="flip">' + esc(T('flip')) + '</button>';
       if (!S.sel.closed) h += '<button data-c="extend">' + esc(T('extend')) + '</button>';
       h += '</div>';
+      if (S.sel.has_path) {
+        h += '<div class="row-btns path-btns"><button class="ok" data-c="continue_path">➜ ' + esc(T('continue_path')) +
+          '</button><button data-c="replace_path">⇄ ' + esc(T('replace_path')) + '</button></div>';
+      }
       if (S.sel.kind === 'member') {
         h += '<label class="chk"><input type="checkbox" id="similar"' + (S.similar ? ' checked' : '') + '><span>' + esc(T('similar')) + '</span></label>';
       }
@@ -270,6 +308,7 @@
     var h = '<div class="actions">';
     h += '<button class="primary" data-c="draw">✏️ ' + esc(T('draw')) + '</button>';
     h += '<button class="primary alt" data-c="build_selection">⚡ ' + esc(T('build')) + '</button>';
+    h += '<button class="wide" data-c="eyedropper">🎯 ' + esc(T('eyedropper')) + '</button>';
     h += '</div>';
     return h;
   }
@@ -289,8 +328,9 @@
         S.catalog.forEach(function (e) { if (e.category === c) items.push({ id: e.id, name: S.lang === 'fa' ? e.fa : e.en, alt: e.en + ' ' + e.fa, loops: e.thumb }); });
       }
       if (q) items = items.filter(function (it) { return (it.name + ' ' + (it.alt || '')).toLowerCase().indexOf(q) >= 0; });
-      if (!items.length) return;
+      if (!items.length && c !== 'custom') return;
       h += '<div class="cat">' + esc(T('cat_' + c)) + '</div><div class="grid">';
+      if (c === 'custom') h += '<button class="pcard add" data-c="pick_face" title="' + esc(T('add_profile_help')) + '"><b>+</b><span>' + esc(T('add_profile')) + '</span></button>';
       items.forEach(function (it) {
         h += '<button class="pcard' + (spec.profile === it.id ? ' on' : '') + '" data-p="' + esc(it.id) + '" title="' + esc(it.name) + '">' +
           thumbSVG(it.loops) + '<span>' + esc(it.name) + '</span>' +
@@ -320,7 +360,8 @@
 
     h += '<section class="card"><h4>' + esc(T('preview')) + '</h4><div id="pv">' + previewSVG(S.preview.member) + '</div></section>';
     h += actions('member');
-    h += '<div class="actions sub"><button data-c="save_face">' + esc(T('save_face')) + '</button></div>';
+    h += '<div class="actions sub two"><button data-c="import_library">⬆ ' + esc(T('import_lib')) + '</button><button data-c="export_library">⬇ ' +
+      esc(T('export_lib')) + '</button></div>';
     $('main').innerHTML = h;
 
     bind('search', 'input', function (e) {
@@ -356,22 +397,55 @@
     return null;
   }
 
-  function renderAssembly() {
-    var spec = current();
-    var h = '<section class="card"><h4>' + esc(T('preset')) + '</h4><select id="preset">';
-    S.presets.forEach(function (p) {
-      h += '<option value="' + esc(p.id) + '"' + (spec.preset === p.id ? ' selected' : '') + '>' + esc(S.lang === 'fa' ? p.fa : p.en) + '</option>';
+  function presetCards(spec) {
+    var h = '';
+    ['railing', 'fence', 'wall', 'trim', 'structure'].forEach(function (cat) {
+      var list = S.presets.filter(function (p) { return p.category === cat; });
+      if (!list.length) return;
+      h += '<div class="cat">' + esc(T('pc_' + cat)) + '</div><div class="pgrid">';
+      list.forEach(function (p) {
+        h += '<button class="acard' + (spec.preset === p.id ? ' on' : '') + '" data-preset="' + esc(p.id) + '">' + elevSVG(p.thumb, 120, 64, 4) +
+          '<span>' + esc(S.lang === 'fa' ? p.fa : p.en) + '</span></button>';
+      });
+      h += '</div>';
     });
     var user = S.library.assemblies || [];
     if (user.length) {
-      h += '<optgroup label="' + esc(T('my_assemblies')) + '">';
-      user.forEach(function (a) { h += '<option value="' + esc(a.id) + '"' + (spec.preset === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>'; });
-      h += '</optgroup>';
+      h += '<div class="cat">' + esc(T('my_assemblies')) + '</div><div class="pgrid">';
+      user.forEach(function (a) {
+        h += '<button class="acard' + (spec.preset === a.id ? ' on' : '') + '" data-preset="' + esc(a.id) + '">' + elevSVG(a.thumb, 120, 64, 4) +
+          '<span>' + esc(a.name) + '</span><i class="del" data-del="' + esc(a.id) + '">×</i></button>';
+      });
+      h += '</div>';
     }
-    h += '<option value="custom"' + (spec.preset === 'custom' ? ' selected' : '') + '>' + esc(T('preset_custom')) + '</option></select>';
+    return h;
+  }
+
+  function choosePreset(id) {
+    var spec = current();
+    var pe2 = presetEntry(id);
+    spec.preset = id;
+    if (pe2) {
+      spec.preset_params = {};
+      pe2.params.forEach(function (p) { spec.preset_params[p.key] = p['default']; });
+      send({ type: 'preset_rows', preset: id, params: spec.preset_params });
+    } else {
+      (S.library.assemblies || []).forEach(function (a) {
+        if (a.id === id) { spec.rows = clone(a.rows); spec.openings = clone(a.openings || []); }
+      });
+      changed();
+    }
+    S.openRow = -1;
+    renderAssembly();
+  }
+
+  function renderAssembly() {
+    var spec = current();
+    var h = '<section class="card"><h4>' + esc(T('preset')) + (spec.preset === 'custom' ? ' — ' + esc(T('preset_custom')) : '') + '</h4>';
+    h += '<div class="presets">' + presetCards(spec) + '</div>';
     var pe = presetEntry(spec.preset);
     if (pe) {
-      h += '<div class="fields">';
+      h += '<h4 class="sub">' + esc(T('preset_settings')) + ' — ' + esc(S.lang === 'fa' ? pe.fa : pe.en) + '</h4><div class="fields">';
       pe.params.forEach(function (p) {
         var v = spec.preset_params && spec.preset_params[p.key] !== undefined ? spec.preset_params[p.key] : p['default'];
         h += lenField(S.lang === 'fa' ? p.fa : p.en, v, function (val) {
@@ -385,13 +459,15 @@
     h += check(T('flip_all'), spec.flip, function (v) { spec.flip = v; changed(); });
     h += '</section>';
 
-    h += '<section class="card"><h4>' + esc(T('preview')) + '</h4><div id="pv">' + previewSVG(S.preview.assembly) + '</div></section>';
+    var pv = S.preview.assembly || {};
+    h += '<section class="card"><h4>' + esc(T('elevation')) + '</h4><div id="pvel">' + elevSVG(pv.elevation, 320, 150, 8) + '</div>' +
+      '<h4 class="sub">' + esc(T('preview')) + '</h4><div id="pv">' + previewSVG(pv) + '</div></section>';
 
     // parts
     h += '<section class="card"><h4>' + esc(T('parts')) + '</h4><div class="rows">';
     (spec.rows || []).forEach(function (r, i) { h += rowHTML(spec, r, i); });
     h += '</div><div class="row-btns"><button data-c="add_layer">' + esc(T('add_layer')) + '</button><button data-c="add_repeat">' +
-      esc(T('add_repeat')) + '</button></div></section>';
+      esc(T('add_repeat')) + '</button><button data-c="add_component">' + esc(T('add_component')) + '</button></div></section>';
 
     // openings
     h += '<section class="card"><h4>' + esc(T('openings')) + '</h4>';
@@ -410,26 +486,10 @@
     h += actions('assembly');
     h += '<div class="actions sub"><button data-c="save_assembly">' + esc(T('save_assembly')) + '</button></div>';
     $('main').innerHTML = h;
-
-    bind('preset', 'change', function (e) {
-      var id = e.target.value;
-      var pe2 = presetEntry(id);
-      spec.preset = id;
-      if (pe2) {
-        spec.preset_params = {};
-        pe2.params.forEach(function (p) { spec.preset_params[p.key] = p['default']; });
-        send({ type: 'preset_rows', preset: id, params: spec.preset_params });
-      } else {
-        var ua = null;
-        (S.library.assemblies || []).forEach(function (a) { if (a.id === id) ua = a; });
-        if (ua) { spec.rows = clone(ua.rows); spec.openings = clone(ua.openings || []); }
-        changed({ render: true });
-      }
-      renderAssembly();
-    });
   }
 
   function rowSummary(r) {
+    if (r.type === 'component') return (r.component || '?') + ' @' + toUnit(r.spacing);
     var s = profileName(r.profile, r.name) + ' ';
     var e = catalogEntry(r.profile);
     if (e) s += e.params.map(function (p) { return toUnit(r.params && r.params[p.key] !== undefined ? r.params[p.key] : p['default']); }).join('×');
@@ -448,6 +508,7 @@
       var nameId = nid();
       bind(nameId, 'input', function (e) { r.name = e.target.value; edit(); });
       h += '<label class="fld"><span>' + esc(T('name')) + '</span><input id="' + nameId + '" value="' + esc(r.name) + '"></label>';
+      if (r.type === 'component') { h += componentFields(spec, r, i); return h + '</div></div>'; }
       var pid = nid();
       var opts = '';
       S.catalog.forEach(function (e) { opts += '<option value="' + e.id + '"' + (r.profile === e.id ? ' selected' : '') + '>' + esc(S.lang === 'fa' ? e.fa : e.en) + '</option>'; });
@@ -496,6 +557,43 @@
         esc(T('remove')) + '</button></div></div>';
     }
     h += '</div>';
+    return h;
+  }
+
+  function componentFields(spec, r, i) {
+    var edit = function () { spec.preset = 'custom'; changed(); };
+    var cid = nid(), h = '';
+    var opts = '<option value="">—</option>';
+    var names = S.components.map(function (c) { return c.name; });
+    if (r.component && names.indexOf(r.component) < 0) names.push(r.component);
+    names.forEach(function (n) { opts += '<option' + (n === r.component ? ' selected' : '') + ' value="' + esc(n) + '">' + esc(n) + '</option>'; });
+    bind(cid, 'change', function (e) {
+      var c = null;
+      S.components.forEach(function (x) { if (x.name === e.target.value) c = x; });
+      r.component = e.target.value;
+      if (c) { r.comp_w = c.w; r.comp_d = c.d; r.comp_h = c.h; if (!r.length) r.length = c.h; }
+      spec.preset = 'custom'; changed({ render: true });
+    });
+    h += '<label class="fld"><span>' + esc(T('component')) + '</span><select id="' + cid + '">' + opts + '</select></label>';
+    h += '<label class="fld"><span>&nbsp;</span><button class="pickc" data-c="pick_component" data-i="' + i + '">🎯 ' + esc(T('pick_component')) + '</button></label>';
+    h += lenField(T('offset_u'), r.offset_u || 0, function (v) { r.offset_u = v; edit(); });
+    h += lenField(T('v0'), r.v0 || 0, function (v) { r.v0 = v; edit(); });
+    h += lenField(T('spacing'), r.spacing || 400, function (v) { r.spacing = v; edit(); });
+    h += lenField(T('length'), r.length || r.comp_h || 0, function (v) { r.length = v; edit(); });
+    h += lenField(T('setback_start'), r.setback_start || 0, function (v) { r.setback_start = v; edit(); });
+    h += lenField(T('setback_end'), r.setback_end || 0, function (v) { r.setback_end = v; edit(); });
+    h += '</div>';
+    h += '<p class="muted small">' + esc(T('comp_size')) + ': ' + esc([r.comp_w, r.comp_d, r.comp_h].map(toUnit).join(' × ') + ' ' + S.units) + '</p>';
+    h += check(T('scale_len'), r.scale, function (v) { r.scale = v; edit(); });
+    h += check(T('at_corners'), r.at_corners, function (v) { r.at_corners = v; edit(); });
+    h += check(T('jambs'), r.jambs, function (v) { r.jambs = v; edit(); });
+    h += '<div class="pos-r"><div class="lbl">' + esc(T('rotation')) + '</div>' +
+      rotationButtons(r.rotation, function (v) { r.rotation = v; spec.preset = 'custom'; changed({ render: true }); }) +
+      check(T('flip'), r.flip, function (v) { r.flip = v; edit(); }) + '</div>';
+    h += materialSelect(r.material || '', function (m) { r.material = m; edit(); });
+    h += '<div class="row-btns"><button data-c="row_up" data-i="' + i + '">↑ ' + esc(T('up')) + '</button><button data-c="row_down" data-i="' + i + '">↓ ' +
+      esc(T('down')) + '</button><button data-c="row_dup" data-i="' + i + '">' + esc(T('duplicate')) + '</button><button class="danger" data-c="row_del" data-i="' + i + '">' +
+      esc(T('remove')) + '</button></div>';
     return h;
   }
 
@@ -580,6 +678,8 @@
     }
     var pc = t.closest('[data-p]');
     if (pc) { chooseProfile(pc.getAttribute('data-p')); return; }
+    var pr = t.closest('[data-preset]');
+    if (pr) { choosePreset(pr.getAttribute('data-preset')); return; }
     var b = t.closest('[data-c]');
     if (!b) return;
     var c = b.getAttribute('data-c'), i = Number(b.getAttribute('data-i'));
@@ -588,8 +688,20 @@
       case 'draw': case 'build_selection':
         send({ type: c, kind: S.tab, spec: S[S.tab] });
         break;
-      case 'rotate': case 'flip': case 'extend': case 'save_face':
+      case 'rotate': case 'flip': case 'extend': case 'save_face': case 'pick_face': case 'eyedropper': case 'edit_path':
+      case 'edit_shape': case 'shape_done': case 'shape_cancel': case 'continue_path': case 'replace_path':
+      case 'export_library': case 'import_library':
         send({ type: c });
+        break;
+      case 'pick_component': send({ type: 'pick_component', row: i }); break;
+      case 'add_component':
+        spec.rows = spec.rows || [];
+        spec.rows.push({ type: 'component', name: 'Component ' + (spec.rows.length + 1), component: '', comp_w: 100, comp_d: 100, comp_h: 1000,
+          scale: false, offset_u: 0, rotation: 0, flip: false, v0: 0, length: 1000, spacing: 1200, setback_start: 0, setback_end: 0,
+          mode: 'even', at_corners: false, jambs: false, material: '', visible: true });
+        S.openRow = spec.rows.length - 1; spec.preset = 'custom';
+        send({ type: 'components' });
+        changed({ render: true });
         break;
       case 'save_assembly': send({ type: 'save_assembly', spec: spec }); break;
       case 'eye':
@@ -655,13 +767,14 @@
           S.lang = m.lang || 'fa'; S.units = UNITS[m.units] ? m.units : 'mm';
           S.catalog = m.catalog; S.presets = m.presets; S.library = m.library || S.library;
           S.materials = m.materials || []; S.member = m.member; S.assembly = m.assembly;
+          S.components = m.components || []; S.shape = !!m.shape_edit;
           if (m.mode === 'assembly') S.tab = 'assembly';
           render();
           requestPreview();
           break;
         case 'selection': {
           var before = S.sel ? S.sel.kind : null;
-          S.sel = m.item ? { kind: m.item.kind, spec: m.item.spec, count: m.item.count, closed: m.item.closed } : null;
+          S.sel = m.item ? { kind: m.item.kind, spec: m.item.spec, count: m.item.count, closed: m.item.closed, has_path: m.item.has_path } : null;
           if (S.sel && (S.tab === 'member' || S.tab === 'assembly' || S.tab === 'guide') && S.tab !== S.sel.kind) S.tab = S.sel.kind;
           S.openRow = -1;
           if (S.tab === 'member' || S.tab === 'assembly' || before) render();
@@ -671,6 +784,7 @@
         case 'preview':
           S.preview[m.kind] = m.data;
           if (m.kind === S.tab && $('pv')) $('pv').innerHTML = previewSVG(m.data);
+          if (m.kind === S.tab && $('pvel')) $('pvel').innerHTML = elevSVG(m.data.elevation, 320, 150, 8);
           break;
         case 'preset_rows': {
           var spec = current();
@@ -689,6 +803,17 @@
         case 'library': S.library = m.library; if (S.tab === 'member' || S.tab === 'assembly') render(); break;
         case 'use_spec': S[m.kind] = m.spec; S.tab = m.kind; render(); requestPreview(); break;
         case 'materials': S.materials = m.materials || []; break;
+        case 'components': S.components = m.components || []; if (S.tab === 'assembly' && S.openRow >= 0) renderAssembly(); break;
+        case 'component_picked': {
+          var sp = current(), row = sp && sp.rows ? sp.rows[m.row] : null;
+          if (row) {
+            row.component = m.name; row.comp_w = m.w; row.comp_d = m.d; row.comp_h = m.h;
+            if (!row.scale) row.length = m.h;
+            sp.preset = 'custom'; changed({ render: true });
+          }
+          break;
+        }
+        case 'shape_edit': S.shape = !!m.active; renderBanner(); break;
         case 'quantities': S.qty = m.rows || []; if (S.tab === 'qty') renderQty(); break;
         case 'tab': S.tab = m.tab; if (m.tab === 'qty') send({ type: 'quantities' }); render(); break;
         case 'toast': toast(m.text, m.level); break;

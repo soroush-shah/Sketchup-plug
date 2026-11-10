@@ -145,6 +145,18 @@ module BanianStudio
         when 'select_key' then Quantities.select_key(Sketchup.active_model, msg['key'])
         when 'export_csv' then export_csv(msg['headers'], msg['rows'])
         when 'open_url' then UI.openURL(msg['url'].to_s) if msg['url'].to_s =~ /\Ahttps?:/
+        when 'pick_face' then pick_face
+        when 'eyedropper' then Sketchup.active_model.select_tool(MatchTool.new)
+        when 'edit_path' then Sketchup.active_model.select_tool(PathEditTool.new)
+        when 'edit_shape' then begin_shape_edit
+        when 'shape_done' then finish_shape_edit
+        when 'shape_cancel' then cancel_shape_edit
+        when 'continue_path' then continue_on_selected_path
+        when 'replace_path' then replace_path
+        when 'components' then push_components
+        when 'pick_component' then pick_component(msg['row'])
+        when 'export_library' then export_library
+        when 'import_library' then import_library
         end
       rescue StandardError => e
         report_error(e)
@@ -161,12 +173,13 @@ module BanianStudio
           'catalog' => Profiles.catalog_json, 'presets' => Presets.json,
           'lang' => lang, 'units' => Library.get('units', 'mm'), 'mode' => mode,
           'member' => spec_for('member'), 'assembly' => spec_for('assembly'),
-          'library' => Library.data, 'materials' => material_names
+          'library' => library_payload, 'materials' => material_names,
+          'components' => component_list, 'shape_edit' => shape_editing?
         )
       end
 
       def push_library
-        send_js('type' => 'library', 'library' => Library.data)
+        send_js('type' => 'library', 'library' => library_payload)
       end
 
       def material_names
@@ -198,6 +211,7 @@ module BanianStudio
       end
 
       def push_selection
+        sel = Sketchup.active_model.selection
         items = selected_pb
         if items.empty?
           send_js('type' => 'selection', 'item' => nil)
@@ -206,9 +220,10 @@ module BanianStudio
         info = Builder.read(items[0])
         return unless info
         len = PathOps.length(info['path'], info['closed']) * 25.4
+        has_path = sel.any? { |e| e.is_a?(Sketchup::Edge) || e.is_a?(Sketchup::Face) }
         send_js('type' => 'selection', 'item' => {
                   'kind' => info['kind'], 'spec' => info['spec'], 'count' => items.size,
-                  'closed' => info['closed'], 'length_mm' => len.round(1)
+                  'closed' => info['closed'], 'length_mm' => len.round(1), 'has_path' => has_path
                 })
       end
 
@@ -294,6 +309,11 @@ module BanianStudio
         end
         k = mode
         spec = spec_for(k)
+        src = selected_pb.first
+        if src && (info = Builder.read(src))
+          k = info['kind']
+          spec = info['spec']
+        end
         model.start_operation('Banian Build', true)
         groups = paths.map { |pts, closed, up| Builder.create(model.active_entities, k, spec, pts, closed, up) }.compact
         model.commit_operation
@@ -391,36 +411,10 @@ module BanianStudio
         model = Sketchup.active_model
         faces = model.selection.grep(Sketchup::Face)
         if faces.size != 1
-          UI.messagebox(t('select_face'))
+          pick_face
           return
         end
-        f = faces[0]
-        n = f.normal
-        z = Geom::Vector3d.new(0, 0, 1)
-        x = n.parallel?(z) ? Geom::Vector3d.new(1, 0, 0) : z.cross(n)
-        x.normalize!
-        y = n.cross(x)
-        y.normalize!
-        o = f.outer_loop.vertices[0].position
-        loops = ([f.outer_loop] + (f.loops - [f.outer_loop])).map do |lp|
-          lp.vertices.map do |v|
-            d = v.position - o
-            [(d.dot(x) * 25.4).round(3), (d.dot(y) * 25.4).round(3)]
-          end
-        end
-        bb = Profiles.bbox(loops)
-        loops = loops.map { |l| l.map { |q| [(q[0] - bb[0]).round(3), (q[1] - bb[1]).round(3)] } }
-        res = UI.inputbox([t('profile_name')], ['My profile'], 'Banian Profile Builder')
-        return unless res
-        name = res[0].to_s.strip
-        name = 'My profile' if name.empty?
-        id = Library.add_profile(name, loops)
-        bb = Profiles.bbox(loops)
-        spec = spec_for('member').merge('profile' => id, 'custom_loops' => loops, 'custom_name' => name,
-                                        'params' => { 'w' => (bb[2] - bb[0]).round(2), 'h' => (bb[3] - bb[1]).round(2) })
-        set_spec('member', spec)
-        push_library
-        send_js('type' => 'use_spec', 'kind' => 'member', 'spec' => spec)
+        add_face_profile(faces[0])
       end
 
       def save_assembly(spec)
@@ -458,7 +452,7 @@ module BanianStudio
               { 'type' => 'layer', 'hidden' => hidden, 'loops' => loops }
             end
           end
-          { 'parts' => parts }
+          { 'parts' => parts, 'elevation' => Assembly.elevation(spec) }
         else
           { 'parts' => [{ 'type' => 'layer', 'loops' => Profiles.placed_loops(spec) }] }
         end

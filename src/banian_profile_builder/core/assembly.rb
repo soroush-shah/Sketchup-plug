@@ -15,13 +15,29 @@ module BanianStudio
 
       module_function
 
+      def component?(row)
+        row['type'] == 'component'
+      end
+
+      def repeated?(row)
+        row['type'] == 'repeat' || row['type'] == 'component'
+      end
+
       def row_profile_spec(row)
+        if component?(row)
+          return {
+            'profile' => 'rect',
+            'params' => { 'w' => [row['comp_w'].to_f, 1.0].max, 'h' => [row['comp_d'].to_f, 1.0].max },
+            'anchor' => 'mc', 'rotation' => row['rotation'] || 0, 'flip' => row['flip'] ? true : false,
+            'offset_u' => row['offset_u'] || 0, 'offset_v' => 0
+          }
+        end
         {
           'profile' => row['profile'] || 'rect', 'params' => row['params'] || {},
           'custom_loops' => row['custom_loops'],
-          'anchor' => row['anchor'] || (row['type'] == 'repeat' ? 'mc' : 'bc'),
+          'anchor' => row['anchor'] || (repeated?(row) ? 'mc' : 'bc'),
           'rotation' => row['rotation'] || 0, 'flip' => row['flip'] ? true : false,
-          'offset_u' => row['offset_u'] || 0, 'offset_v' => row['type'] == 'repeat' ? 0 : (row['offset_v'] || 0)
+          'offset_u' => row['offset_u'] || 0, 'offset_v' => repeated?(row) ? 0 : (row['offset_v'] || 0)
         }
       end
 
@@ -105,7 +121,7 @@ module BanianStudio
           loops_mm = Profiles.placed_loops(row_profile_spec(row))
           next if loops_mm.empty?
           loops = Profiles.to_inches(loops_mm)
-          if row['type'] == 'repeat'
+          if repeated?(row)
             result[:repeats] << plan_repeat(row, idx, loops, pts, closed, frs, cum, total, corner_s, openings)
           else
             bb = Profiles.bbox(loops)
@@ -128,7 +144,11 @@ module BanianStudio
         bb = Profiles.bbox(loops)
         th = bb[3] - bb[1] # thickness along the path
         v0 = (row['v0'] || 0).to_f * MM
-        len = [(row['length'] || 2400).to_f * MM, 0.04].max
+        len = if component?(row) && !row['scale']
+                [row['comp_h'].to_f * MM, 0.04].max
+              else
+                [(row['length'] || 2400).to_f * MM, 0.04].max
+              end
         list = positions(total, closed, row, corner_s).map { |s| [s, false] }
         if row['jambs']
           openings.select { |o| o[:jambs] }.each do |o|
@@ -166,9 +186,39 @@ module BanianStudio
         plan[:repeats].each do |rp|
           r = rp[:row]
           total = rp[:items].inject(0.0) { |s, it| s + it[:len] } * 25.4
-          q << qty_entry(r, 'repeat', rp[:items].size, total, rp[:area_mm2])
+          e = qty_entry(r, r['type'], rp[:items].size, total, component?(r) ? 0.0 : rp[:area_mm2])
+          if component?(r)
+            e['profile'] = "component:#{r['component']}"
+            e['size'] = [r['comp_w'], r['comp_d'], r['comp_h']].map { |v| Profiles.fmt(v) }.join("\u00D7")
+          end
+          q << e
         end
         q
+      end
+
+      # Front elevation of an assembly on a straight path (for thumbnails and
+      # the panel preview). Returns [x0, y0, x1, y1, type, material, hidden, depth]
+      # rectangles in mm, sorted back to front.
+      def elevation(spec, length_mm = 2400.0)
+        prep = Sweep.prepare([[0.0, 0.0, 0.0], [length_mm * MM, 0.0, 0.0]], false, nil)
+        pl = plan(prep, spec)
+        rects = []
+        pl[:layers].each do |l|
+          bb = Profiles.bbox(l[:loops])
+          l[:paths].each do |p, _|
+            xs = p.map { |q| q[0] }
+            rects << [xs.min * 25.4, bb[1] * 25.4, xs.max * 25.4, bb[3] * 25.4, 'layer',
+                      l[:row]['material'].to_s, l[:row]['visible'] == false, (bb[0] + bb[2]) * 12.7]
+          end
+        end
+        pl[:repeats].each do |rp|
+          bb = Profiles.bbox(rp[:loops])
+          rp[:items].each do |it|
+            rects << [(it[:s] + bb[1]) * 25.4, it[:v0] * 25.4, (it[:s] + bb[3]) * 25.4, (it[:v0] + it[:len]) * 25.4,
+                      rp[:row]['type'], rp[:row]['material'].to_s, rp[:row]['visible'] == false, (bb[0] + bb[2]) * 12.7]
+          end
+        end
+        rects.sort_by { |r| r[7] }.map { |r| r[0, 4].map { |v| v.round(1) } + r[4, 3] }
       end
 
       def qty_entry(row, type, count, length_mm, area_mm2)

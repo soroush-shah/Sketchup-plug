@@ -18,7 +18,7 @@ module BanianStudio
 end
 PB = BanianStudio::ProfileBuilder
 %w[core/vec core/profiles core/path core/sweep core/assembly core/presets
-   su/library su/builder su/quantities su/controller tools/draw_tool tools/extend_tool].each do |f|
+   su/library su/builder su/quantities su/controller tools/draw_tool tools/extend_tool tools/pick_tools tools/path_edit_tool su/editing].each do |f|
   require File.join(PB::PLUGIN_DIR, f)
 end
 
@@ -126,3 +126,80 @@ class TestChunking < Minitest::Test
     assert meshes.all? { |mm| mm.points.size <= 2 * PB::Builder::CHUNK + 64 }
   end
 end
+
+class TestEditingFeatures < Minitest::Test
+  def setup
+    Sketchup.reset!
+    PB::Builder.forget_cache(Sketchup.active_model)
+    @m = Sketchup.active_model
+  end
+
+  def path
+    [[0, 0, 0], [3000.mm, 0, 0]]
+  end
+
+  def test_component_row_places_user_component
+    d = @m.definitions.add('Fancy baluster')
+    d.bounds = Sketchup::ComponentDefinition::Bounds.new(Geom::Point3d.new(-1, -1, 0), Geom::Point3d.new(1, 1, 30))
+    row = { 'type' => 'component', 'name' => 'Baluster', 'component' => 'Fancy baluster', 'comp_w' => 50.8,
+            'comp_d' => 50.8, 'comp_h' => 762, 'spacing' => 500, 'v0' => 0, 'scale' => false }
+    spec = { 'preset' => 'custom', 'rows' => [row], 'openings' => [] }
+    g = PB::Builder.create(@m.active_entities, 'assembly', spec, path, false)
+    insts = g.entities.grep(Sketchup::ComponentInstance)
+    assert_equal 7, insts.size
+    assert insts.all? { |i| i.definition.equal?(d) }
+    q = JSON.parse(g.get_attribute(PB::Builder::DICT, 'qty'))
+    assert_equal 'component:Fancy baluster', q[0]['profile']
+    assert_equal 7, q[0]['count']
+    el = PB::Assembly.elevation(spec)
+    assert_equal 6, el.size, "thumbnail uses a 2.4 m straight path"
+  end
+
+  def test_every_preset_has_a_thumbnail
+    PB::Presets.json.each do |p|
+      refute_empty p['thumb'], p['id']
+      assert p['thumb'].all? { |r| r[2] >= r[0] && r[3] >= r[1] }, p['id']
+    end
+    assert PB::Presets::LIST.count { |e| e.category == 'railing' } >= 8
+  end
+
+  def test_replace_path_with_closed_loop
+    g = PB::Builder.create(@m.active_entities, 'member', { 'profile' => 'rect', 'params' => {} }, path, false)
+    square = [[0, 0, 0], [100, 0, 0], [100, 100, 0], [0, 100, 0]]
+    assert PB::Builder.rebuild(g, nil, square, true, nil)
+    info = PB::Builder.read(g)
+    assert info['closed']
+    assert_equal [0.0, 0.0, 1.0], info['up']
+    assert_equal 0, g.entities.grep(Sketchup::Face).size, 'closed loop has no caps'
+  end
+
+  def test_live_profile_update_everywhere
+    loops = [[[0, 0], [40, 0], [40, 10], [0, 10]]]
+    spec = { 'profile' => 'custom_x', 'custom_loops' => loops, 'custom_name' => 'Bar', 'params' => { 'w' => 40, 'h' => 10 } }
+    a = PB::Builder.create(@m.active_entities, 'member', spec, path, false)
+    b = PB::Builder.create(@m.active_entities, 'member', spec.merge('params' => { 'w' => 80, 'h' => 20 }), path, false)
+    asm = { 'rows' => [{ 'type' => 'layer', 'name' => 'Rail', 'profile' => 'custom_x', 'custom_loops' => loops, 'params' => { 'w' => 40, 'h' => 10 } }] }
+    c = PB::Builder.create(@m.active_entities, 'assembly', asm, path, false)
+    new_loops = [[[0, 0], [60, 0], [60, 30], [0, 30]]]
+    PB::Controller.update_profile_everywhere(@m, 'custom_x', new_loops, 60, 30, 40, 10)
+    sa = PB::Builder.read(a)['spec']
+    sb = PB::Builder.read(b)['spec']
+    sc = PB::Builder.read(c)['spec']['rows'][0]
+    assert_equal new_loops, sa['custom_loops']
+    assert_equal({ 'w' => 60.0, 'h' => 30.0 }, sa['params'])
+    assert_equal({ 'w' => 120.0, 'h' => 60.0 }, sb['params'], 'keeps its own 2x size ratio')
+    assert_equal new_loops, sc['custom_loops']
+  end
+
+  def test_library_import_export_roundtrip
+    dir = Dir.mktmpdir
+    PB::Library.instance_variable_set(:@data, { 'profiles' => [{ 'id' => 'custom_a', 'name' => 'A', 'loops' => [] }], 'assemblies' => [] })
+    PB::Library.define_singleton_method(:folder) { dir }
+    f = File.join(dir, 'x.json')
+    PB::Library.export_to(f)
+    PB::Library.instance_variable_set(:@data, { 'profiles' => [], 'assemblies' => [] })
+    assert_equal 1, PB::Library.import_from(f)
+    assert_equal 0, PB::Library.import_from(f), 'no duplicates'
+  end
+end
+require 'tmpdir'

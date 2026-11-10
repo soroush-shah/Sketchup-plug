@@ -33,9 +33,13 @@ module Geom
     attr_reader :origin
     def initialize(o = nil) = (@origin = o || Point3d.new)
     def self.axes(o, *_a) = new(o)
+    def self.translation(v) = new(Point3d.new(v.x, v.y, v.z))
+    def self.rotation(*_a) = new
+    def self.scaling(*_a) = new
     def inverse = Transformation.new(Point3d.new(-origin.x, -origin.y, -origin.z))
     def *(p)
       return p if p.is_a?(Vector3d)
+      return Transformation.new(self * p.origin) if p.is_a?(Transformation)
       Point3d.new(p.x + origin.x, p.y + origin.y, p.z + origin.z)
     end
   end
@@ -118,6 +122,15 @@ module Sketchup
     def instances = @instances_list
     def count_instances = @instances_list.size
     def group? = @group ? true : false
+    def image? = false
+    Bounds = Struct.new(:min, :max) do
+      def center = Geom::Point3d.new((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
+      def width = max.x - min.x
+      def height = max.y - min.y
+      def depth = max.z - min.z
+    end
+    attr_writer :bounds
+    def bounds = @bounds || Bounds.new(Geom::Point3d.new, Geom::Point3d.new(1, 1, 1))
   end
 
   class Group < Entity

@@ -10,8 +10,8 @@ module BanianStudio
     PLUGIN_DIR = dir unless defined?(PLUGIN_DIR)
 
     %w[core/vec core/profiles core/path core/sweep core/assembly core/presets
-       su/library su/builder su/quantities su/controller
-       tools/draw_tool tools/extend_tool].each { |f| require File.join(PLUGIN_DIR, f) }
+       su/library su/builder su/quantities su/controller su/editing
+       tools/draw_tool tools/extend_tool tools/pick_tools tools/path_edit_tool].each { |f| require File.join(PLUGIN_DIR, f) }
 
     class SelObserver < Sketchup::SelectionObserver
       def onSelectionBulkChange(_s)
@@ -92,13 +92,27 @@ module BanianStudio
         Controller.show
         Controller.send_js('type' => 'tab', 'tab' => 'qty')
       end
-      cmds[:face] = command('Save Face as Profile', 'face', 'Save the selected face as a reusable custom profile.') { Controller.save_face_profile }
-      [:rotate, :flip].each { |k| cmds[k].set_validation_proc { has_pb_selection } }
+      cmds[:face] = command('Add My Profile (Pick Face)', 'face', 'Click any face (or use the selected one) to save it as your own profile.') { Controller.pick_face }
+      cmds[:path] = command('Edit Path', 'edit_path', 'Move, add or delete path points directly on a Banian object.') do
+        Sketchup.active_model.select_tool(PathEditTool.new)
+      end
+      cmds[:match] = command('Eyedropper (Reuse Object)', 'match', 'Click a Banian object to reuse its profile / assembly, then draw a new path.') do
+        Sketchup.active_model.select_tool(MatchTool.new)
+      end
+      cmds[:shape] = command('Edit Profile Shape', 'shape', 'Edit the cross-section of the selected profile with SketchUp tools; all users of the profile update.') do
+        Controller.show
+        Controller.begin_shape_edit
+      end
+      cmds[:continue] = command('Build Same on Selected Path', 'build', 'Repeat the selected Banian object on the selected edges / faces.') { Controller.continue_on_selected_path }
+      cmds[:replace] = command('Move Object to Selected Path', 'edit_path', 'Rebuild the selected Banian object on the selected edges / face.') { Controller.replace_path }
+      [:rotate, :flip, :shape].each { |k| cmds[k].set_validation_proc { has_pb_selection } }
 
       menu = UI.menu('Extensions').add_submenu('Banian Profile Builder')
-      [:panel, :draw, :build, :extend].each { |k| menu.add_item(cmds[k]) }
+      [:panel, :draw, :build, :match].each { |k| menu.add_item(cmds[k]) }
       menu.add_separator
-      [:rotate, :flip, :face].each { |k| menu.add_item(cmds[k]) }
+      [:path, :extend, :rotate, :flip, :shape].each { |k| menu.add_item(cmds[k]) }
+      menu.add_separator
+      [:face, :continue, :replace].each { |k| menu.add_item(cmds[k]) }
       menu.add_separator
       menu.add_item(cmds[:qty])
       menu.add_item('User Guide') do
@@ -110,7 +124,7 @@ module BanianStudio
       end
 
       tb = UI::Toolbar.new('Banian Profile Builder')
-      [:panel, :draw, :build, :extend, :rotate, :flip, :qty].each { |k| tb.add_item(cmds[k]) }
+      [:panel, :draw, :build, :match, :path, :extend, :rotate, :flip, :face, :qty].each { |k| tb.add_item(cmds[k]) }
       tb.restore if tb.get_last_state != TB_HIDDEN
 
       UI.add_context_menu_handler do |cm|
@@ -121,11 +135,15 @@ module BanianStudio
         sub = cm.add_submenu('Banian Profile Builder')
         if has_pb
           sub.add_item('Edit in Panel') { Controller.show }
-          sub.add_item(cmds[:extend])
-          sub.add_item(cmds[:rotate])
-          sub.add_item(cmds[:flip])
+          [:path, :extend, :rotate, :flip].each { |k| sub.add_item(cmds[k]) }
+          sub.add_item(cmds[:shape]) if sel.any? { |e| Builder.kind(e) == 'member' }
+          sub.add_item(cmds[:match])
         end
-        if has_path
+        if has_path && has_pb
+          sub.add_separator
+          sub.add_item(cmds[:continue])
+          sub.add_item(cmds[:replace])
+        elsif has_path
           sub.add_item(cmds[:build])
           sub.add_item(cmds[:face]) if sel.grep(Sketchup::Face).size == 1
         end

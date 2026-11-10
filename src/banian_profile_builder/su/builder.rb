@@ -27,7 +27,8 @@ module BanianStudio
         'BPB Metal' => [[160, 166, 172], 1.0],
         'BPB Glass' => [[150, 200, 225], 0.35],
         'BPB White' => [[242, 240, 234], 1.0],
-        'BPB Concrete' => [[180, 178, 172], 1.0]
+        'BPB Concrete' => [[180, 178, 172], 1.0],
+        'BPB Dark Metal' => [[62, 65, 70], 1.0]
       }.freeze
 
       module_function
@@ -148,12 +149,16 @@ module BanianStudio
         group.set_attribute(DICT, 'up', up ? JSON.generate(up) : nil)
       end
 
-      def rebuild(group, spec = nil, new_path = nil)
+      # new_closed / new_up are only used together with new_path (a path
+      # taken from other edges); :keep keeps the stored values.
+      def rebuild(group, spec = nil, new_path = nil, new_closed = :keep, new_up = :keep)
         info = read(group)
         return false unless info
         spec ||= info['spec']
         pts = new_path || info['path']
-        prep = Sweep.prepare(pts, info['closed'], info['up'])
+        closed = new_closed == :keep ? info['closed'] : new_closed
+        up = new_up == :keep ? info['up'] : new_up
+        prep = Sweep.prepare(pts, closed, up)
         return false if prep[:points].size < 2
         group.make_unique if group.definition.count_instances > 1
         old_defs = JSON.parse(group.get_attribute(DICT, 'defs', '[]')) rescue []
@@ -223,6 +228,10 @@ module BanianStudio
         plan[:repeats].each do |rp|
           row = rp[:row]
           mat = material(model, row['material'])
+          if Assembly.component?(row)
+            place_components(ents, model, rp, mat)
+            next
+          end
           rp[:items].each do |it|
             d = piece_definition(model, rp[:loops], it[:len], row['name'])
             next unless d
@@ -242,6 +251,35 @@ module BanianStudio
         end
         group.name = name
         finish(group, spec, Assembly.quantities(plan), defs)
+      end
+
+      # The user's own component repeated along the path (decorative
+      # balusters, lamps, planters...). Its footprint centre sits on the
+      # placed position, its bottom at the row's start height. With 'scale'
+      # it is stretched to the piece length.
+      def place_components(ents, model, rp, mat)
+        row = rp[:row]
+        d = model.definitions[row['component'].to_s]
+        return unless d && d.valid?
+        bb = d.bounds
+        h = bb.max.z - bb.min.z
+        lb = Profiles.bbox(rp[:loops])
+        cu = (lb[0] + lb[2]) / 2.0
+        cv = (lb[1] + lb[3]) / 2.0
+        base = Geom::Transformation.translation(Geom::Vector3d.new(-bb.center.x, -bb.center.y, -bb.min.z))
+        rot = Geom::Transformation.rotation(Geom::Point3d.new(0, 0, 0), Geom::Vector3d.new(0, 0, 1),
+                                            row['rotation'].to_f * Math::PI / 180.0)
+        rp[:items].each do |it|
+          t, r, u = it[:frame]
+          sz = row['scale'] && h > 1e-6 ? it[:len] / h : 1.0
+          sx = row['flip'] ? -1.0 : 1.0
+          scale = Geom::Transformation.scaling(Geom::Point3d.new(0, 0, 0), sx, 1.0, sz)
+          o = Vec.add(Vec.add(it[:origin], Vec.mul(u, it[:v0])), Vec.add(Vec.mul(r, cu), Vec.mul(t, cv)))
+          place = Geom::Transformation.axes(pt(o), Geom::Vector3d.new(*r), Geom::Vector3d.new(*t), Geom::Vector3d.new(*u))
+          inst = ents.add_instance(d, place * rot * scale * base)
+          inst.material = mat if mat
+          inst.hidden = true if row['visible'] == false
+        end
       end
 
       # Shared definition for a straight piece: studs, posts and balusters

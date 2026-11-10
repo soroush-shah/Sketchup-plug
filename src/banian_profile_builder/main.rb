@@ -10,7 +10,7 @@ module BanianStudio
     PLUGIN_DIR = dir unless defined?(PLUGIN_DIR)
 
     %w[core/vec core/profiles core/path core/sweep core/assembly core/presets
-       su/library su/builder su/quantities su/controller su/editing
+       su/library su/builder su/quantities su/controller su/editing su/silhouette su/auto_assemble
        tools/draw_tool tools/extend_tool tools/pick_tools tools/path_edit_tool].each { |f| require File.join(PLUGIN_DIR, f) }
 
     class SelObserver < Sketchup::SelectionObserver
@@ -105,6 +105,9 @@ module BanianStudio
       end
       cmds[:continue] = command('Build Same on Selected Path', 'build', 'Repeat the selected Banian object on the selected edges / faces.') { Controller.continue_on_selected_path }
       cmds[:replace] = command('Move Object to Selected Path', 'edit_path', 'Rebuild the selected Banian object on the selected edges / face.') { Controller.replace_path }
+      cmds[:assemble] = command('Make Assembly from Selection', 'assemble', 'Turn the selected Banian profiles and components you placed by hand into a reusable assembly.') do
+        Controller.assembly_from_selection
+      end
       [:rotate, :flip, :shape].each { |k| cmds[k].set_validation_proc { has_pb_selection } }
 
       menu = UI.menu('Extensions').add_submenu('Banian Profile Builder')
@@ -112,7 +115,7 @@ module BanianStudio
       menu.add_separator
       [:path, :extend, :rotate, :flip, :shape].each { |k| menu.add_item(cmds[k]) }
       menu.add_separator
-      [:face, :continue, :replace].each { |k| menu.add_item(cmds[k]) }
+      [:face, :assemble, :continue, :replace].each { |k| menu.add_item(cmds[k]) }
       menu.add_separator
       menu.add_item(cmds[:qty])
       menu.add_item('User Guide') do
@@ -124,7 +127,7 @@ module BanianStudio
       end
 
       tb = UI::Toolbar.new('Banian Profile Builder')
-      [:panel, :draw, :build, :match, :path, :extend, :rotate, :flip, :face, :qty].each { |k| tb.add_item(cmds[k]) }
+      [:panel, :draw, :build, :match, :path, :extend, :rotate, :flip, :face, :assemble, :qty].each { |k| tb.add_item(cmds[k]) }
       tb.restore if tb.get_last_state != TB_HIDDEN
 
       UI.add_context_menu_handler do |cm|
@@ -138,6 +141,9 @@ module BanianStudio
           [:path, :extend, :rotate, :flip].each { |k| sub.add_item(cmds[k]) }
           sub.add_item(cmds[:shape]) if sel.any? { |e| Builder.kind(e) == 'member' }
           sub.add_item(cmds[:match])
+        end
+        if has_pb && (sel.size > 1)
+          sub.add_item(cmds[:assemble])
         end
         if has_path && has_pb
           sub.add_separator

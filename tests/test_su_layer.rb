@@ -18,7 +18,7 @@ module BanianStudio
 end
 PB = BanianStudio::ProfileBuilder
 %w[core/vec core/profiles core/path core/sweep core/assembly core/presets
-   su/library su/builder su/quantities su/controller tools/draw_tool tools/extend_tool tools/pick_tools tools/path_edit_tool su/editing].each do |f|
+   su/library su/builder su/quantities su/controller tools/draw_tool tools/extend_tool tools/pick_tools tools/path_edit_tool su/editing su/silhouette su/auto_assemble].each do |f|
   require File.join(PB::PLUGIN_DIR, f)
 end
 
@@ -203,3 +203,108 @@ class TestEditingFeatures < Minitest::Test
   end
 end
 require 'tmpdir'
+
+class TestBaysAndAutoAssemble < Minitest::Test
+  MM = 1 / 25.4
+
+  def setup
+    Sketchup.reset!
+    PB::Builder.forget_cache(Sketchup.active_model)
+    @m = Sketchup.active_model
+  end
+
+  def posts_row(extra = {})
+    { 'type' => 'repeat', 'name' => 'Post', 'profile' => 'rect', 'params' => { 'w' => 50, 'h' => 50 },
+      'length' => 1000, 'spacing' => 1500, 'at_corners' => true }.merge(extra)
+  end
+
+  def bay_row(extra = {})
+    { 'type' => 'bay', 'name' => 'Panel', 'component' => 'Panel', 'comp_w' => 1000, 'comp_d' => 30, 'comp_h' => 800,
+      'bay_ref' => 0, 'fit' => 'stretch', 'v0' => 100 }.merge(extra)
+  end
+
+  def plan(spec, pts, closed = false)
+    PB::Assembly.plan(PB::Sweep.prepare(pts, closed), spec)
+  end
+
+  def test_bays_fill_between_posts
+    pl = plan({ 'rows' => [posts_row, bay_row] }, [[0, 0, 0], [3000 * MM, 0, 0]])
+    bays = pl[:bays][0][:items]
+    assert_equal 2, bays.size
+    bays.each { |b| assert_in_delta 1450, b[:along] * 25.4, 0.01 }
+    assert_in_delta 25, bays[0][:s0] * 25.4, 0.01
+  end
+
+  def test_tile_keeps_shape
+    pl = plan({ 'rows' => [posts_row, bay_row('fit' => 'tile', 'comp_w' => 300)] }, [[0, 0, 0], [3000 * MM, 0, 0]])
+    assert_equal 10, pl[:bays][0][:items].size
+  end
+
+  def test_bays_never_cross_corners_and_skip_openings
+    sq = [[0, 0, 0], [2000 * MM, 0, 0], [2000 * MM, 2000 * MM, 0], [0, 2000 * MM, 0]]
+    pl = plan({ 'rows' => [bay_row('bay_ref' => '', 'spacing' => 1000)] }, sq, true)
+    assert_equal 8, pl[:bays][0][:items].size
+    pl = plan({ 'rows' => [posts_row, bay_row], 'openings' => [{ 'at' => 1600, 'width' => 900, 'sill' => 0, 'head' => 0 }] },
+              [[0, 0, 0], [3000 * MM, 0, 0]])
+    assert_equal 1, pl[:bays][0][:items].size, 'the gate span stays open'
+  end
+
+  def test_builder_places_bays_and_reports
+    d = @m.definitions.add('Panel')
+    d.bounds = Sketchup::ComponentDefinition::Bounds.new(Geom::Point3d.new(0, -1, 0), Geom::Point3d.new(40, 1, 30))
+    g = PB::Builder.create(@m.active_entities, 'assembly', { 'rows' => [posts_row, bay_row] }, [[0, 0, 0], [3000 * MM, 0, 0]], false)
+    bays = g.entities.grep(Sketchup::ComponentInstance).select { |i| i.definition.equal?(d) }
+    assert_equal 2, bays.size
+    q = JSON.parse(g.get_attribute(PB::Builder::DICT, 'qty')).find { |e| e['type'] == 'bay' }
+    assert_equal 2, q['count']
+    el = PB::Assembly.elevation('rows' => [posts_row, bay_row])
+    assert(el.any? { |r| r[4] == 'bay' && r[7] == 1 })
+  end
+
+  def test_make_assembly_from_hand_placed_parts
+    rail = { 'profile' => 'round_bar', 'params' => { 'd' => 50 }, 'anchor' => 'mc' }
+    runs = [
+      { spec: rail, pts: [[0, 0, 900 * MM], [3000 * MM, 0, 900 * MM]], name: 'Handrail', material: '' },
+      { spec: { 'profile' => 'rect', 'params' => { 'w' => 30, 'h' => 30 }, 'anchor' => 'bl', 'offset_u' => 0 },
+        pts: [[3000 * MM, 0, 100 * MM], [0, 0, 100 * MM]], name: 'Bottom rail', material: '' }
+    ]
+    posts = [0, 1500, 3000].map do |x|
+      { spec: { 'profile' => 'rect', 'params' => { 'w' => 50, 'h' => 50 } }, center: [x * MM, 0, 450 * MM], zmin: 0, zmax: 900 * MM }
+    end
+    comps = [{ name: 'Ornament', center: [750 * MM, 0, 500 * MM], zmin: 150 * MM, w: 1000, d: 20, h: 700, xaxis: [1, 0, 0] }]
+    prep, rows = PB::Controller.plan_from_parts(runs[0][:pts], false, nil, runs, posts, comps)
+    assert_in_delta 0, prep[:points][0][2], 1e-6, 'path moved to the floor'
+    assert_equal %w[layer layer repeat bay], rows.map { |r| r['type'] }
+    assert_in_delta 900, rows[0]['offset_v'], 0.01
+    assert_in_delta 100, rows[1]['offset_v'], 0.01
+    assert rows[1]['flip'], 'reversed rail is mirrored'
+    assert_equal 'br', rows[1]['anchor']
+    assert_in_delta 1500, rows[2]['spacing'], 0.01
+    assert_in_delta 0, rows[2]['v0'], 0.01
+    assert_equal 2, rows[3]['bay_ref']
+    assert_in_delta 150, rows[3]['v0'], 0.01
+  end
+end
+
+class TestSilhouette < Minitest::Test
+  class FrontFace < Sketchup::Face
+    Loop = Struct.new(:vertices)
+    def initialize(pts, n) = (@p = pts; @n = n)
+    def loops = [Loop.new(@p.map { |q| Sketchup::Vertex.new(Geom::Point3d.new(*q)) })]
+    def normal = Geom::Vector3d.new(*@n)
+  end
+
+  def test_front_view_of_component
+    Sketchup.reset!
+    m = Sketchup.active_model
+    d = m.definitions.add('Panel')
+    d.bounds = Sketchup::ComponentDefinition::Bounds.new(Geom::Point3d.new(0, 0, 0), Geom::Point3d.new(40, 1, 30))
+    d.entities.list << FrontFace.new([[0, 0, 0], [40, 0, 0], [40, 0, 30], [0, 0, 30]], [0, -1, 0])
+    d.entities.list << FrontFace.new([[0, 1, 0], [40, 1, 0], [40, 1, 30], [0, 1, 30]], [0, 1, 0])
+    s = PB::Silhouette.of(d, 'x')
+    assert_equal 1, s['polys'].size, 'only the face looking at the viewer'
+    assert_in_delta 1016, s['h1'], 0.1
+    sp = PB::Silhouette.for_spec(m, 'rows' => [{ 'type' => 'bay', 'component' => 'Panel' }])
+    assert sp.key?('Panel|x')
+  end
+end

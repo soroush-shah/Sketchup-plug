@@ -9,7 +9,7 @@
   var S = {
     lang: 'fa', units: 'mm', tab: 'member', catalog: [], presets: [], library: { profiles: [], assemblies: [] },
     materials: [], member: null, assembly: null, sel: null, qty: [], similar: false, openRow: -1,
-    search: '', preview: {}, components: [], shape: false
+    search: '', preview: {}, components: [], shape: false, sil: {}
   };
 
   // ---------- helpers ------------------------------------------------------
@@ -233,20 +233,50 @@
     if (m) { var h = 0; for (var i = 0; i < m.length; i++) h = (h * 31 + m.charCodeAt(i)) % 360; return 'hsl(' + h + ',35%,62%)'; }
     return type === 'layer' ? '#7fa7e8' : '#d4b26a';
   }
-  // Front view of an assembly: rects [x0, y0, x1, y1, type, material, hidden]
-  function elevSVG(rects, W, H, pad) {
+  // Front view of an assembly: rects [x0, y0, x1, y1, type, material, hidden, rowIndex, flip].
+  // Component / bay rects are drawn with the real component silhouette
+  // (one <symbol> per component, reused with <use>, so it stays fast).
+  var silSeq = 0;
+  function silSymbol(key, defs, ids) {
+    if (ids[key]) return ids[key];
+    var sl = S.sil[key];
+    if (!sl || !sl.polys || !sl.polys.length) return null;
+    var id = 'sil' + (++silSeq), w = (sl.h1 - sl.h0) || 1, h = (sl.z1 - sl.z0) || 1, g = '';
+    sl.polys.forEach(function (pp) {
+      var d = '';
+      pp[0].forEach(function (flat) {
+        for (var k = 0; k < flat.length; k += 2) d += (k ? 'L' : 'M') + (flat[k] - sl.h0).toFixed(1) + ' ' + (sl.z1 - flat[k + 1]).toFixed(1);
+        d += 'Z';
+      });
+      g += '<path d="' + d + '" fill="' + (pp[1] || '#b9a27a') + '" fill-rule="evenodd" stroke="rgba(0,0,0,.35)" stroke-width="' + (Math.max(w, h) / 250).toFixed(2) + '"/>';
+    });
+    defs.push('<symbol id="' + id + '" viewBox="0 0 ' + w.toFixed(1) + ' ' + h.toFixed(1) + '" preserveAspectRatio="none">' + g + '</symbol>');
+    ids[key] = id;
+    return id;
+  }
+  function elevSVG(rects, W, H, pad, rows) {
     if (!rects || !rects.length) return '<svg viewBox="0 0 ' + W + ' ' + H + '"></svg>';
     var b = [Infinity, Infinity, -Infinity, -Infinity];
     rects.forEach(function (r) { b[0] = Math.min(b[0], r[0]); b[1] = Math.min(b[1], r[1], 0); b[2] = Math.max(b[2], r[2]); b[3] = Math.max(b[3], r[3]); });
     var w = b[2] - b[0] || 1, h = b[3] - b[1] || 1, k = Math.min((W - 2 * pad) / w, (H - 2 * pad) / h);
-    var ox = (W - w * k) / 2, oy = (H - h * k) / 2, g = '';
+    var ox = (W - w * k) / 2, oy = (H - h * k) / 2, g = '', defs = [], ids = {};
     g += '<line x1="0" x2="' + W + '" y1="' + (oy + h * k).toFixed(1) + '" y2="' + (oy + h * k).toFixed(1) + '" class="el-ground"/>';
     rects.forEach(function (r) {
       var x = ox + (r[0] - b[0]) * k, y = oy + (b[3] - r[3]) * k, rw = Math.max((r[2] - r[0]) * k, 0.6), rh = Math.max((r[3] - r[1]) * k, 0.6);
+      var row = rows && r[7] !== undefined && r[7] !== null ? rows[r[7]] : null;
+      if (row && (r[4] === 'component' || r[4] === 'bay') && row.component) {
+        var sid = silSymbol(row.component + '|' + (r[4] === 'bay' ? 'x' : 'y'), defs, ids);
+        if (sid) {
+          var tf = r[8] && r[4] === 'component' ? ' transform="translate(' + (2 * x + rw).toFixed(1) + ' 0) scale(-1 1)"' : '';
+          g += '<use href="#' + sid + '" xlink:href="#' + sid + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + rw.toFixed(1) +
+            '" height="' + rh.toFixed(1) + '"' + tf + (r[6] ? ' class="el-hidden"' : '') + '/>';
+          return;
+        }
+      }
       g += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + rw.toFixed(1) + '" height="' + rh.toFixed(1) +
         '" fill="' + matFill(r[5], r[4]) + '" class="el' + (r[6] ? ' el-hidden' : '') + '"/>';
     });
-    return '<svg class="elev" viewBox="0 0 ' + W + ' ' + H + '">' + g + '</svg>';
+    return '<svg class="elev" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' + W + ' ' + H + '"><defs>' + defs.join('') + '</defs>' + g + '</svg>';
   }
 
   // ---------- header / tabs / banner ---------------------------------------
@@ -413,7 +443,7 @@
     if (user.length) {
       h += '<div class="cat">' + esc(T('my_assemblies')) + '</div><div class="pgrid">';
       user.forEach(function (a) {
-        h += '<button class="acard' + (spec.preset === a.id ? ' on' : '') + '" data-preset="' + esc(a.id) + '">' + elevSVG(a.thumb, 120, 64, 4) +
+        h += '<button class="acard' + (spec.preset === a.id ? ' on' : '') + '" data-preset="' + esc(a.id) + '">' + elevSVG(a.thumb, 120, 64, 4, a.rows) +
           '<span>' + esc(a.name) + '</span><i class="del" data-del="' + esc(a.id) + '">×</i></button>';
       });
       h += '</div>';
@@ -460,14 +490,15 @@
     h += '</section>';
 
     var pv = S.preview.assembly || {};
-    h += '<section class="card"><h4>' + esc(T('elevation')) + '</h4><div id="pvel">' + elevSVG(pv.elevation, 320, 150, 8) + '</div>' +
+    h += '<section class="card"><h4>' + esc(T('elevation')) + '</h4><div id="pvel">' + elevSVG(pv.elevation, 320, 150, 8, spec.rows) + '</div>' +
       '<h4 class="sub">' + esc(T('preview')) + '</h4><div id="pv">' + previewSVG(pv) + '</div></section>';
 
     // parts
     h += '<section class="card"><h4>' + esc(T('parts')) + '</h4><div class="rows">';
     (spec.rows || []).forEach(function (r, i) { h += rowHTML(spec, r, i); });
     h += '</div><div class="row-btns"><button data-c="add_layer">' + esc(T('add_layer')) + '</button><button data-c="add_repeat">' +
-      esc(T('add_repeat')) + '</button><button data-c="add_component">' + esc(T('add_component')) + '</button></div></section>';
+      esc(T('add_repeat')) + '</button><button data-c="add_component">' + esc(T('add_component')) + '</button><button data-c="add_bay">' +
+      esc(T('add_bay')) + '</button></div></section>';
 
     // openings
     h += '<section class="card"><h4>' + esc(T('openings')) + '</h4>';
@@ -484,12 +515,14 @@
       esc(T('add_window')) + '</button><button data-c="add_gate">' + esc(T('add_gate')) + '</button></div></section>';
 
     h += actions('assembly');
-    h += '<div class="actions sub"><button data-c="save_assembly">' + esc(T('save_assembly')) + '</button></div>';
+    h += '<div class="actions sub two"><button data-c="save_assembly">' + esc(T('save_assembly')) + '</button><button data-c="make_assembly" title="' +
+      esc(T('make_assembly_help')) + '">🧩 ' + esc(T('make_assembly')) + '</button></div>';
     $('main').innerHTML = h;
   }
 
   function rowSummary(r) {
     if (r.type === 'component') return (r.component || '?') + ' @' + toUnit(r.spacing);
+    if (r.type === 'bay') return (r.component || '?') + ' · ' + T(r.fit === 'tile' ? 'fit_tile' : 'fit_stretch');
     var s = profileName(r.profile, r.name) + ' ';
     var e = catalogEntry(r.profile);
     if (e) s += e.params.map(function (p) { return toUnit(r.params && r.params[p.key] !== undefined ? r.params[p.key] : p['default']); }).join('×');
@@ -508,7 +541,7 @@
       var nameId = nid();
       bind(nameId, 'input', function (e) { r.name = e.target.value; edit(); });
       h += '<label class="fld"><span>' + esc(T('name')) + '</span><input id="' + nameId + '" value="' + esc(r.name) + '"></label>';
-      if (r.type === 'component') { h += componentFields(spec, r, i); return h + '</div></div>'; }
+      if (r.type === 'component' || r.type === 'bay') { h += componentFields(spec, r, i); return h + '</div></div>'; }
       var pid = nid();
       var opts = '';
       S.catalog.forEach(function (e) { opts += '<option value="' + e.id + '"' + (r.profile === e.id ? ' selected' : '') + '>' + esc(S.lang === 'fa' ? e.fa : e.en) + '</option>'; });
@@ -576,18 +609,49 @@
     });
     h += '<label class="fld"><span>' + esc(T('component')) + '</span><select id="' + cid + '">' + opts + '</select></label>';
     h += '<label class="fld"><span>&nbsp;</span><button class="pickc" data-c="pick_component" data-i="' + i + '">🎯 ' + esc(T('pick_component')) + '</button></label>';
+    var tid = nid();
+    bind(tid, 'change', function (e) {
+      r.type = e.target.value;
+      if (r.type === 'bay' && r.bay_ref === undefined) {
+        var pi = -1; spec.rows.forEach(function (x, k) { if (pi < 0 && x.type === 'repeat') pi = k; });
+        r.bay_ref = pi >= 0 ? pi : ''; r.fit = r.fit || 'stretch'; r.gap = r.gap || 0;
+      }
+      spec.preset = 'custom'; changed({ render: true });
+    });
+    h += '<label class="fld"><span>' + esc(T('rep_kind')) + '</span><select id="' + tid + '"><option value="component"' + (r.type === 'component' ? ' selected' : '') + '>' +
+      esc(T('kind_single')) + '</option><option value="bay"' + (r.type === 'bay' ? ' selected' : '') + '>' + esc(T('kind_bay')) + '</option></select></label>';
+    if (r.type === 'bay') {
+      var fid = nid(), rid = nid();
+      bind(fid, 'change', function (e) { r.fit = e.target.value; edit(); });
+      h += '<label class="fld"><span>' + esc(T('fit')) + '</span><select id="' + fid + '"><option value="stretch"' + (r.fit !== 'tile' ? ' selected' : '') + '>' +
+        esc(T('fit_stretch')) + '</option><option value="tile"' + (r.fit === 'tile' ? ' selected' : '') + '>' + esc(T('fit_tile')) + '</option></select></label>';
+      bind(rid, 'change', function (e) { r.bay_ref = e.target.value === '' ? '' : Number(e.target.value); spec.preset = 'custom'; changed({ render: true }); });
+      var ro = '<option value="">' + esc(T('own_spacing')) + '</option>';
+      spec.rows.forEach(function (x, k) {
+        if (x.type === 'repeat' || x.type === 'component') ro += '<option value="' + k + '"' + (String(r.bay_ref) === String(k) ? ' selected' : '') + '>' + esc(x.name || ('#' + (k + 1))) + '</option>';
+      });
+      h += '<label class="fld"><span>' + esc(T('between')) + '</span><select id="' + rid + '">' + ro + '</select></label>';
+      h += lenField(T('gap'), r.gap || 0, function (v) { r.gap = v; edit(); });
+    }
     h += lenField(T('offset_u'), r.offset_u || 0, function (v) { r.offset_u = v; edit(); });
     h += lenField(T('v0'), r.v0 || 0, function (v) { r.v0 = v; edit(); });
-    h += lenField(T('spacing'), r.spacing || 400, function (v) { r.spacing = v; edit(); });
+    if (r.type !== 'bay' || r.bay_ref === '' || r.bay_ref === undefined) h += lenField(T('spacing'), r.spacing || 400, function (v) { r.spacing = v; edit(); });
     h += lenField(T('length'), r.length || r.comp_h || 0, function (v) { r.length = v; edit(); });
-    h += lenField(T('setback_start'), r.setback_start || 0, function (v) { r.setback_start = v; edit(); });
-    h += lenField(T('setback_end'), r.setback_end || 0, function (v) { r.setback_end = v; edit(); });
+    if (r.type !== 'bay') {
+      h += lenField(T('setback_start'), r.setback_start || 0, function (v) { r.setback_start = v; edit(); });
+      h += lenField(T('setback_end'), r.setback_end || 0, function (v) { r.setback_end = v; edit(); });
+    }
     h += '</div>';
+    var sk = r.component ? S.sil[r.component + '|' + (r.type === 'bay' ? 'x' : 'y')] : null;
+    if (sk) h += '<div class="silbox">' + elevSVG([[0, 0, sk.h1 - sk.h0, sk.z1 - sk.z0, r.type, '', false, 0, false]], 140, 90, 4, [r]) + '</div>';
     h += '<p class="muted small">' + esc(T('comp_size')) + ': ' + esc([r.comp_w, r.comp_d, r.comp_h].map(toUnit).join(' × ') + ' ' + S.units) + '</p>';
     h += check(T('scale_len'), r.scale, function (v) { r.scale = v; edit(); });
-    h += check(T('at_corners'), r.at_corners, function (v) { r.at_corners = v; edit(); });
-    h += check(T('jambs'), r.jambs, function (v) { r.jambs = v; edit(); });
-    h += '<div class="pos-r"><div class="lbl">' + esc(T('rotation')) + '</div>' +
+    if (r.type !== 'bay') {
+      h += check(T('at_corners'), r.at_corners, function (v) { r.at_corners = v; edit(); });
+      h += check(T('jambs'), r.jambs, function (v) { r.jambs = v; edit(); });
+    }
+    if (r.type === 'bay') h += check(T('flip'), r.flip, function (v) { r.flip = v; edit(); });
+    else h += '<div class="pos-r"><div class="lbl">' + esc(T('rotation')) + '</div>' +
       rotationButtons(r.rotation, function (v) { r.rotation = v; spec.preset = 'custom'; changed({ render: true }); }) +
       check(T('flip'), r.flip, function (v) { r.flip = v; edit(); }) + '</div>';
     h += materialSelect(r.material || '', function (m) { r.material = m; edit(); });
@@ -690,10 +754,21 @@
         break;
       case 'rotate': case 'flip': case 'extend': case 'save_face': case 'pick_face': case 'eyedropper': case 'edit_path':
       case 'edit_shape': case 'shape_done': case 'shape_cancel': case 'continue_path': case 'replace_path':
-      case 'export_library': case 'import_library':
+      case 'export_library': case 'import_library': case 'make_assembly':
         send({ type: c });
         break;
       case 'pick_component': send({ type: 'pick_component', row: i }); break;
+      case 'add_bay': {
+        spec.rows = spec.rows || [];
+        var pi = -1; spec.rows.forEach(function (x, k) { if (pi < 0 && x.type === 'repeat') pi = k; });
+        spec.rows.push({ type: 'bay', name: 'Bay ' + (spec.rows.length + 1), component: '', comp_w: 1000, comp_d: 40, comp_h: 800,
+          bay_ref: pi >= 0 ? pi : '', fit: 'stretch', gap: 0, scale: false, offset_u: 0, rotation: 0, flip: false, v0: 100, length: 800,
+          spacing: 1500, material: '', visible: true });
+        S.openRow = spec.rows.length - 1; spec.preset = 'custom';
+        send({ type: 'components' });
+        changed({ render: true });
+        break;
+      }
       case 'add_component':
         spec.rows = spec.rows || [];
         spec.rows.push({ type: 'component', name: 'Component ' + (spec.rows.length + 1), component: '', comp_w: 100, comp_d: 100, comp_h: 1000,
@@ -766,6 +841,7 @@
         case 'init':
           S.lang = m.lang || 'fa'; S.units = UNITS[m.units] ? m.units : 'mm';
           S.catalog = m.catalog; S.presets = m.presets; S.library = m.library || S.library;
+          if (S.library.sil) S.sil = S.library.sil;
           S.materials = m.materials || []; S.member = m.member; S.assembly = m.assembly;
           S.components = m.components || []; S.shape = !!m.shape_edit;
           if (m.mode === 'assembly') S.tab = 'assembly';
@@ -784,7 +860,8 @@
         case 'preview':
           S.preview[m.kind] = m.data;
           if (m.kind === S.tab && $('pv')) $('pv').innerHTML = previewSVG(m.data);
-          if (m.kind === S.tab && $('pvel')) $('pvel').innerHTML = elevSVG(m.data.elevation, 320, 150, 8);
+          if (m.data && m.data.sil) Object.keys(m.data.sil).forEach(function (k) { S.sil[k] = m.data.sil[k]; });
+          if (m.kind === S.tab && $('pvel')) $('pvel').innerHTML = elevSVG(m.data.elevation, 320, 150, 8, current().rows);
           break;
         case 'preset_rows': {
           var spec = current();
@@ -800,7 +877,7 @@
           }
           break;
         }
-        case 'library': S.library = m.library; if (S.tab === 'member' || S.tab === 'assembly') render(); break;
+        case 'library': S.library = m.library; if (m.library && m.library.sil) Object.keys(m.library.sil).forEach(function (k) { S.sil[k] = m.library.sil[k]; }); if (S.tab === 'member' || S.tab === 'assembly') render(); break;
         case 'use_spec': S[m.kind] = m.spec; S.tab = m.kind; render(); requestPreview(); break;
         case 'materials': S.materials = m.materials || []; break;
         case 'components': S.components = m.components || []; if (S.tab === 'assembly' && S.openRow >= 0) renderAssembly(); break;

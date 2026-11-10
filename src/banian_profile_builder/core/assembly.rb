@@ -23,6 +23,10 @@ module BanianStudio
         row['type'] == 'repeat' || row['type'] == 'component'
       end
 
+      def bay?(row)
+        row['type'] == 'bay'
+      end
+
       def row_profile_spec(row)
         if component?(row)
           return {
@@ -115,9 +119,14 @@ module BanianStudio
           { a: at, b: at + w, sill: sill, head: head, jambs: o['jambs'] ? true : false }
         end
         flip = spec['flip'] ? true : false
-        result = { layers: [], repeats: [], total: total }
+        result = { layers: [], repeats: [], bays: [], total: total }
+        bay_rows = []
         (spec['rows'] || []).each_with_index do |row0, idx|
           row = apply_global_flip(row0, flip)
+          if bay?(row)
+            bay_rows << [row, idx]
+            next
+          end
           loops_mm = Profiles.placed_loops(row_profile_spec(row))
           next if loops_mm.empty?
           loops = Profiles.to_inches(loops_mm)
@@ -137,7 +146,53 @@ module BanianStudio
                                  area_mm2: Profiles.area(loops_mm) }
           end
         end
+        bay_rows.each do |row, idx|
+          result[:bays] << plan_bay(row, idx, result[:repeats], pts, closed, frs, cum, total, corner_s, openings)
+        end
         result
+      end
+
+      # Bays: the user's component fills every span between two posts
+      # (the positions of another repeated row, or its own spacing), never
+      # across a corner. fit 'stretch' = one copy stretched to the span,
+      # 'tile' = whole copies at almost native width.
+      def plan_bay(row, idx, repeats, pts, closed, frs, cum, total, corner_s, openings)
+        ref = repeats.find { |r| r[:index] == row['bay_ref'].to_i && !row['bay_ref'].nil? && row['bay_ref'].to_s != '' }
+        bounds = []
+        if ref
+          rb = Profiles.bbox(ref[:loops])
+          half = (rb[3] - rb[1]) / 2.0
+          ref[:items].map { |it| it[:s] }.uniq.each { |s| bounds << [s, half] }
+        else
+          own = row.merge('at_corners' => true)
+          positions(total, closed, own, corner_s).each { |s| bounds << [s, 0.0] }
+        end
+        corner_s.each { |c| bounds << [c, 0.0] unless bounds.any? { |s, _| (s - c).abs < 1e-3 } }
+        bounds << [total, 0.0] if closed
+        bounds = bounds.sort_by(&:first)
+        gap = (row['gap'] || 0).to_f * MM
+        v0 = (row['v0'] || 0).to_f * MM
+        h = row['scale'] ? (row['length'] || 1000).to_f * MM : row['comp_h'].to_f * MM
+        h = 0.04 if h < 0.04
+        w = [row['comp_w'].to_f * MM, 0.04].max
+        items = []
+        bounds.each_cons(2) do |(a, ha), (b, hb)|
+          s0 = a + ha + gap
+          s1 = b - hb - gap
+          next if s1 - s0 < 0.1
+          blocked = openings.any? { |o| s0 < o[:b] - 1e-6 && s1 > o[:a] + 1e-6 && v0 < o[:head] && v0 + h > o[:sill] }
+          next if blocked
+          n = row['fit'] == 'tile' ? [((s1 - s0) / w).round, 1].max : 1
+          step = (s1 - s0) / n
+          n.times do |k|
+            a0 = s0 + step * k
+            pt, seg, = PathOps.point_at(pts, closed, a0 + step / 2.0, cum)
+            f = frs[[seg, frs.size - 1].min]
+            start = Vec.sub(pt, Vec.mul(f[0], step / 2.0))
+            items << { origin: start, frame: f, v0: v0, len: h, along: step, s: a0 + step / 2.0, s0: a0, s1: a0 + step }
+          end
+        end
+        { row: row, index: idx, items: items }
       end
 
       def plan_repeat(row, idx, loops, pts, closed, frs, cum, total, corner_s, openings)
@@ -193,6 +248,14 @@ module BanianStudio
           end
           q << e
         end
+        (plan[:bays] || []).each do |b|
+          r = b[:row]
+          along = b[:items].inject(0.0) { |s, it| s + it[:along] } * 25.4
+          e = qty_entry(r, 'bay', b[:items].size, along, 0.0)
+          e['profile'] = "component:#{r['component']}"
+          e['size'] = [r['comp_w'], r['comp_d'], r['comp_h']].map { |v| Profiles.fmt(v) }.join("\u00D7")
+          q << e
+        end
         q
       end
 
@@ -208,17 +271,25 @@ module BanianStudio
           l[:paths].each do |p, _|
             xs = p.map { |q| q[0] }
             rects << [xs.min * 25.4, bb[1] * 25.4, xs.max * 25.4, bb[3] * 25.4, 'layer',
-                      l[:row]['material'].to_s, l[:row]['visible'] == false, (bb[0] + bb[2]) * 12.7]
+                      l[:row]['material'].to_s, l[:row]['visible'] == false, (bb[0] + bb[2]) * 12.7, l[:index], false]
           end
         end
         pl[:repeats].each do |rp|
           bb = Profiles.bbox(rp[:loops])
           rp[:items].each do |it|
             rects << [(it[:s] + bb[1]) * 25.4, it[:v0] * 25.4, (it[:s] + bb[3]) * 25.4, (it[:v0] + it[:len]) * 25.4,
-                      rp[:row]['type'], rp[:row]['material'].to_s, rp[:row]['visible'] == false, (bb[0] + bb[2]) * 12.7]
+                      rp[:row]['type'], rp[:row]['material'].to_s, rp[:row]['visible'] == false, (bb[0] + bb[2]) * 12.7,
+                      rp[:index], rp[:row]['flip'] ? true : false]
           end
         end
-        rects.sort_by { |r| r[7] }.map { |r| r[0, 4].map { |v| v.round(1) } + r[4, 3] }
+        (pl[:bays] || []).each do |b|
+          depth = (b[:row]['offset_u'] || 0).to_f
+          b[:items].each do |it|
+            rects << [it[:s0] * 25.4, it[:v0] * 25.4, it[:s1] * 25.4, (it[:v0] + it[:len]) * 25.4, 'bay',
+                      b[:row]['material'].to_s, b[:row]['visible'] == false, depth, b[:index], b[:row]['flip'] ? true : false]
+          end
+        end
+        rects.sort_by { |r| r[7] }.map { |r| r[0, 4].map { |v| v.round(1) } + r[4, 3] + [r[8], r[9]] }
       end
 
       def qty_entry(row, type, count, length_mm, area_mm2)

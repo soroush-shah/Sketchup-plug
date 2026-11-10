@@ -3,7 +3,7 @@
 Fast parametric profiles, assemblies and quantities for SketchUp 2017+ (Windows & macOS).
 Bilingual panel (English / فارسی); SketchUp menus, toolbar and icons in English.
 
-- **Install:** `dist/banian_profile_builder_v1.1.0.rbz` → *Extensions › Extension Manager › Install Extension*
+- **Install:** `dist/banian_profile_builder_v1.2.0.rbz` → *Extensions › Extension Manager › Install Extension*
 - **Guide (فارسی):** [docs/GUIDE_FA.md](docs/GUIDE_FA.md)
 
 ## Features
@@ -16,6 +16,7 @@ Bilingual panel (English / فارسی); SketchUp menus, toolbar and icons in Eng
 - Your own profiles in two clicks (pick any face), live shape editing in place that updates every member and assembly part using the profile, library import/export.
 - Direct path editing (drag / add / delete points), eyedropper, build the same object on another path, move an object to a new path.
 - Your own SketchUp components as repeated assembly parts; 15 assembly presets incl. 9 railings, with elevation thumbnails.
+- Bays: your component fills every span between posts (stretch or tile); Make Assembly from Selection turns hand-placed profiles and components into a reusable assembly; real component silhouettes in all previews.
 - Instant quantity and cost report with CSV export (UTF-8, opens in Excel).
 
 ## Performance design

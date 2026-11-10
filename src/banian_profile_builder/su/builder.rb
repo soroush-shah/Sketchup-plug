@@ -244,6 +244,7 @@ module BanianStudio
             inst.hidden = true if row['visible'] == false
           end
         end
+        (plan[:bays] || []).each { |b| place_bays(ents, model, b) }
         name = spec['name'].to_s
         if name.empty?
           pr = Presets::INDEX[spec['preset'].to_s]
@@ -277,6 +278,33 @@ module BanianStudio
           o = Vec.add(Vec.add(it[:origin], Vec.mul(u, it[:v0])), Vec.add(Vec.mul(r, cu), Vec.mul(t, cv)))
           place = Geom::Transformation.axes(pt(o), Geom::Vector3d.new(*r), Geom::Vector3d.new(*t), Geom::Vector3d.new(*u))
           inst = ents.add_instance(d, place * rot * scale * base)
+          inst.material = mat if mat
+          inst.hidden = true if row['visible'] == false
+        end
+      end
+
+      # Bays: definition X runs along the path (stretched to the span),
+      # Y across, Z up. The bay starts at the span start, centred across.
+      def place_bays(ents, model, bay)
+        row = bay[:row]
+        d = model.definitions[row['component'].to_s]
+        return unless d && d.valid?
+        bb = d.bounds
+        w = bb.max.x - bb.min.x
+        h = bb.max.z - bb.min.z
+        return if w < 1e-6
+        mat = material(model, row['material'])
+        base = Geom::Transformation.translation(Geom::Vector3d.new(-bb.min.x, -bb.center.y, -bb.min.z))
+        off = (row['offset_u'] || 0).to_f / 25.4
+        bay[:items].each do |it|
+          t, r, u = it[:frame]
+          sx = it[:along] / w
+          sz = row['scale'] && h > 1e-6 ? it[:len] / h : 1.0
+          sy = row['flip'] ? -1.0 : 1.0
+          scale = Geom::Transformation.scaling(Geom::Point3d.new(0, 0, 0), sx, sy, sz)
+          o = Vec.add(Vec.add(it[:origin], Vec.mul(u, it[:v0])), Vec.mul(r, off))
+          place = Geom::Transformation.axes(pt(o), Geom::Vector3d.new(*t), Geom::Vector3d.new(*Vec.mul(r, -1.0)), Geom::Vector3d.new(*u))
+          inst = ents.add_instance(d, place * scale * base)
           inst.material = mat if mat
           inst.hidden = true if row['visible'] == false
         end

@@ -7,7 +7,7 @@ require 'extensions.rb'
 
 module BanianStudio
   module ProfileBuilder
-    VERSION = '1.1.0'.freeze
+    VERSION = '1.2.0'.freeze
 
     unless file_loaded?(__FILE__)
       ext = SketchupExtension.new('Banian Profile Builder', 'banian_profile_builder/main')

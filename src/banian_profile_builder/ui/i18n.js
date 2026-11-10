@@ -1,6 +1,10 @@
 /* Banian Profile Builder - panel strings (English / Persian) */
 window.I18N = {
   en: {
+    t_bay: 'bay', add_bay: '+ Bay (fills between posts)', rep_kind: 'Repeat as', kind_single: 'Single pieces at a spacing',
+    kind_bay: 'Bay between posts', fit: 'Fit', fit_stretch: 'Stretch one copy', fit_tile: 'Repeat copies (keep shape)',
+    between: 'Between', own_spacing: 'Own spacing', gap: 'Gap to posts',
+    make_assembly: 'Make from selection', make_assembly_help: 'Select Banian profiles and components you placed by hand (e.g. handrail, rails, posts, a baluster) and turn them into an assembly',
     t_component: 'component', add_component: '+ My component', component: 'Component',
     pick_component: 'Use selected', comp_size: 'Component size', scale_len: 'Stretch to piece length',
     elevation: 'Front view', eyedropper: 'Eyedropper: reuse an object from the model',
@@ -73,12 +77,20 @@ window.I18N = {
 <p>🎯 Click any Banian object in the model, then simply draw: you get the same profile or railing on a new path.</p>
 <h3>Your own components</h3>
 <p>In an assembly press <b>+ My component</b>, select a component in the model and press <b>Use selected</b>. Decorative balusters, lamps or planters repeat along the path like any part.</p>
+<h3>Draw your own railing and make it an assembly</h3>
+<p>Build the parts by hand once: handrail and rails as Banian profiles, posts as vertical Banian profiles, and your decorative pieces as SketchUp components. Select everything and press <b>🧩 Make from selection</b>: Banian measures offsets and spacing, saves it to <i>My assemblies</i> and you can draw it on any path.</p>
+<h3>Bays between posts</h3>
+<p><b>+ Bay</b> puts your component (e.g. a decorative panel) in every span between posts. <i>Stretch one copy</i> fits it exactly; <i>Repeat copies</i> keeps circles and patterns undistorted. Bays never cross corners and skip gates.</p>
 <h3>Quantities</h3>
 <p>Instant list of every piece with count, length and volume. Enter a price per metre for a cost estimate and export to Excel (CSV).</p>
 <h3>Speed tips</h3>
 <p>Banian builds each object as one mesh and repeated parts share one component, so even large models stay fast. Use the Rotate / Flip toolbar buttons for quick changes.</p>`
   },
   fa: {
+    t_bay: 'دهانه', add_bay: '+ دهانه (بین ستون‌ها)', rep_kind: 'نوع تکرار', kind_single: 'قطعه‌های تکی با فاصله',
+    kind_bay: 'دهانه بین ستون‌ها', fit: 'جا شدن', fit_stretch: 'یک نسخه کشیده شود', fit_tile: 'چند نسخه (شکل حفظ شود)',
+    between: 'بین', own_spacing: 'فاصله خودش', gap: 'فاصله تا ستون',
+    make_assembly: 'ساخت از انتخاب', make_assembly_help: 'پروفایل‌ها و کامپوننت‌هایی که دستی چیده‌اید (مثل دست‌انداز، ریل، ستون، یک نرده) را انتخاب کنید تا به اسمبلی تبدیل شوند',
     t_component: 'کامپوننت', add_component: '+ کامپوننت من', component: 'کامپوننت',
     pick_component: 'استفاده از انتخاب‌شده', comp_size: 'ابعاد کامپوننت', scale_len: 'کشیده شود تا طول قطعه',
     elevation: 'نمای روبه‌رو', eyedropper: 'قطره‌چکان: استفاده از یک شیء داخل مدل',
@@ -151,6 +163,10 @@ window.I18N = {
 <p>🎯 روی هر شیء بانیان در مدل کلیک کنید و بعد فقط رسم کنید: همان پروفایل یا نرده روی مسیر جدید ساخته می‌شود.</p>
 <h3>کامپوننت‌های خودتان</h3>
 <p>در اسمبلی <b>+ کامپوننت من</b> را بزنید، یک کامپوننت را در مدل انتخاب کنید و <b>استفاده از انتخاب‌شده</b> را بزنید. نرده تزئینی، چراغ یا گلدان مثل بقیه اجزا در طول مسیر تکرار می‌شود.</p>
+<h3>نرده خودتان را بکشید و اسمبلی کنید</h3>
+<p>یک‌بار اجزا را دستی بسازید: دست‌انداز و ریل‌ها با پروفایل بانیان، ستون‌ها با پروفایل بانیانِ عمودی، و قطعه‌های تزئینی به‌صورت کامپوننت اسکچ‌آپ. همه را انتخاب کنید و <b>🧩 ساخت از انتخاب</b> را بزنید. بانیان فاصله‌ها و ارتفاع‌ها را اندازه می‌گیرد، در «اسمبلی‌های من» ذخیره می‌کند و روی هر مسیری قابل رسم است.</p>
+<h3>دهانه بین ستون‌ها</h3>
+<p><b>+ دهانه</b> کامپوننت شما (مثلاً یک پنل تزئینی) را در هر فاصله بین ستون‌ها می‌گذارد. «یک نسخه کشیده شود» دقیقاً جا می‌شود. «چند نسخه» دایره‌ها و نقش‌ها را بدون کشیدگی نگه می‌دارد. دهانه‌ها هیچ‌وقت از گوشه رد نمی‌شوند و جای ورودی خالی می‌ماند.</p>
 <h3>متره و برآورد</h3>
 <p>لیست فوری همه قطعات با تعداد، طول و حجم. قیمت هر متر را وارد کنید تا هزینه حساب شود و خروجی اکسل (CSV) بگیرید.</p>
 <h3>نکته سرعت</h3>

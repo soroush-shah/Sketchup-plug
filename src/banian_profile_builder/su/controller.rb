@@ -155,6 +155,7 @@ module BanianStudio
         when 'replace_path' then replace_path
         when 'components' then push_components
         when 'pick_component' then pick_component(msg['row'])
+        when 'make_assembly' then assembly_from_selection
         when 'export_library' then export_library
         when 'import_library' then import_library
         end
@@ -443,16 +444,23 @@ module BanianStudio
             row = Assembly.apply_global_flip(row0, flip)
             loops = Profiles.placed_loops(Assembly.row_profile_spec(row))
             hidden = row['visible'] == false
-            if row['type'] == 'repeat'
+            if %w[repeat component bay].include?(row['type'])
               bb = Profiles.bbox(loops)
-              v0 = row['v0'].to_f; v1 = v0 + row['length'].to_f
+              if row['type'] == 'bay'
+                hd = row['comp_d'].to_f / 2.0
+                bb = [row['offset_u'].to_f - hd, 0, row['offset_u'].to_f + hd, 0]
+              end
+              v0 = row['v0'].to_f
+              len = row['type'] != 'repeat' && !row['scale'] ? row['comp_h'].to_f : row['length'].to_f
+              v1 = v0 + len
               { 'type' => 'repeat', 'hidden' => hidden,
                 'loops' => [[[bb[0], v0], [bb[2], v0], [bb[2], v1], [bb[0], v1]]] }
             else
               { 'type' => 'layer', 'hidden' => hidden, 'loops' => loops }
             end
           end
-          { 'parts' => parts, 'elevation' => Assembly.elevation(spec) }
+          { 'parts' => parts, 'elevation' => Assembly.elevation(spec),
+            'sil' => Silhouette.for_spec(Sketchup.active_model, spec) }
         else
           { 'parts' => [{ 'type' => 'layer', 'loops' => Profiles.placed_loops(spec) }] }
         end

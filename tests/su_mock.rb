@@ -14,6 +14,7 @@ module Geom
     def initialize(x = 0, y = 0, z = 0) = (@x, @y, @z = x.to_f, y.to_f, z.to_f)
     def to_a = [x, y, z]
     def -(o) = Vector3d.new(x - o.x, y - o.y, z - o.z)
+    def to_s = to_a.to_s
     def ==(o) = o.is_a?(Point3d) && to_a == o.to_a
     def distance(o) = Math.sqrt((x - o.x)**2 + (y - o.y)**2 + (z - o.z)**2)
   end
@@ -27,6 +28,8 @@ module Geom
     def length = Math.sqrt(dot(self))
     def normalize! = (l = length; @x /= l; @y /= l; @z /= l; self)
     def parallel?(o) = cross(o).length < 1e-9
+    def valid? = length > 1e-12
+    def to_s = to_a.to_s
   end
 
   class Transformation
@@ -87,6 +90,7 @@ module Sketchup
     attr_reader :parent, :list, :meshes
     def initialize(parent) = (@parent = parent; @list = [])
     def entities_list = @list
+    def size = @list.size
     def each(&b) = @list.each(&b)
     def grep(c) = @list.grep(c)
     def add_group
@@ -131,6 +135,7 @@ module Sketchup
     end
     attr_writer :bounds
     def bounds = @bounds || Bounds.new(Geom::Point3d.new, Geom::Point3d.new(1, 1, 1))
+    Bounds.class_eval { def diagonal = Math.sqrt(width**2 + height**2 + depth**2) }
   end
 
   class Group < Entity

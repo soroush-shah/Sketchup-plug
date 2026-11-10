@@ -38,7 +38,10 @@ module BanianStudio
 
       def library_payload
         d = Library.data
+        sil = {}
+        d['assemblies'].each { |a| sil.merge!(Silhouette.for_spec(Sketchup.active_model, a)) }
         {
+          'sil' => sil,
           'profiles' => d['profiles'],
           'assemblies' => d['assemblies'].map do |a|
             thumb = begin

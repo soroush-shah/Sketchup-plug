@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banian Material UV</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f4f5f7; color: #1f2430;
+    font-family: Vazirmatn, "Segoe UI", Tahoma, Arial, sans-serif; font-size: 13px; }
+  body { padding: 10px 12px 90px; }
+  .hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .brand { display: flex; align-items: center; }
+  .logo { width: 30px; height: 30px; border-radius: 7px; background: #1d6f5f; color: #fff; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; margin-inline-end: 8px; margin-right: 8px; }
+  html[dir=rtl] .logo { margin-right: 0; margin-left: 8px; }
+  .title { font-weight: bold; font-size: 15px; }
+  .sub { color: #6b7280; font-size: 11px; }
+  .lang button { border: 1px solid #c9ced6; background: #fff; padding: 3px 9px; cursor: pointer; font-family: inherit; font-size: 12px; }
+  .lang button.on { background: #1d6f5f; color: #fff; border-color: #1d6f5f; }
+  .card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; margin-bottom: 9px; }
+  .card h3 { margin: 0 0 8px; font-size: 13px; color: #1d6f5f; display: flex; align-items: center; justify-content: space-between; }
+  .row { display: flex; align-items: center; margin: 5px 0; flex-wrap: wrap; }
+  .row > label.k { min-width: 92px; color: #4b5563; }
+  .seg { display: flex; flex-wrap: wrap; }
+  .seg label { border: 1px solid #c9ced6; padding: 4px 8px; margin: 2px; border-radius: 5px; cursor: pointer; background: #fafafa; }
+  .seg input { display: none; }
+  .seg label.on { background: #e5f3ef; border-color: #1d6f5f; color: #0f4d41; font-weight: bold; }
+  input[type=number], input[type=text], select { border: 1px solid #c9ced6; border-radius: 5px; padding: 4px 6px; font-family: inherit; font-size: 12px; background: #fff; }
+  input[type=number] { width: 70px; }
+  .btn { border: 1px solid #c9ced6; background: #fff; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-family: inherit; font-size: 12px; margin: 2px; }
+  .btn:hover { border-color: #1d6f5f; }
+  .btn.pri { background: #1d6f5f; color: #fff; border-color: #1d6f5f; font-weight: bold; }
+  .btn.pri:hover { background: #17584c; }
+  .mats { display: flex; flex-wrap: wrap; max-height: 196px; overflow-y: auto; border: 1px solid #eceef1; border-radius: 6px; padding: 4px; background: #fbfbfc; }
+  .mat { width: 62px; margin: 3px; cursor: pointer; text-align: center; border: 2px solid transparent; border-radius: 6px; padding: 2px; }
+  .mat.on { border-color: #1d6f5f; background: #e5f3ef; }
+  .sw { width: 54px; height: 54px; border-radius: 5px; margin: 0 auto; border: 1px solid #d6d9de; background-size: cover; background-position: center; position: relative; }
+  .sw .tx { position: absolute; bottom: 1px; right: 1px; background: rgba(0,0,0,.55); color: #fff; font-size: 9px; border-radius: 3px; padding: 0 3px; direction: ltr; }
+  .mname { font-size: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: ltr; }
+  .modes { display: flex; flex-wrap: wrap; }
+  .mode { width: 48%; margin: 1%; border: 1px solid #d6d9de; border-radius: 7px; padding: 6px 7px; cursor: pointer; background: #fff; display: flex; align-items: flex-start; }
+  .mode.on { border-color: #1d6f5f; background: #e5f3ef; }
+  .mode svg { flex: 0 0 28px; width: 28px; height: 28px; margin-right: 6px; }
+  html[dir=rtl] .mode svg { margin-right: 0; margin-left: 6px; }
+  .mode b { display: block; font-size: 12px; }
+  .mode span { display: block; font-size: 10.5px; color: #6b7280; line-height: 1.35; }
+  .hint { color: #6b7280; font-size: 11px; line-height: 1.5; }
+  .chk { margin: 4px 0; display: block; cursor: pointer; }
+  .hide { display: none !important; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #e1e4e8; padding: 7px 10px; }
+  .bar .acts { display: flex; flex-wrap: wrap; }
+  .bar .acts .pri { flex: 1 1 auto; }
+  .status { font-size: 11.5px; margin-top: 4px; min-height: 16px; }
+  .status.ok { color: #0f7a52; } .status.err { color: #b42318; }
+  .selinfo { font-size: 11px; color: #4b5563; }
+  .ltr { direction: ltr; unicode-bidi: embed; }
+  .info { font-size: 11px; color: #374151; background: #f3f4f6; border-radius: 5px; padding: 5px 7px; margin-top: 6px; }
+  .tips li { margin-bottom: 3px; }
+  details summary { cursor: pointer; color: #1d6f5f; font-weight: bold; }
+</style>
+</head>
+<body>
+<textarea id="bmuv_payload" style="display:none"></textarea>
+
+<div class="hdr">
+  <div class="brand">
+    <div class="logo">UV</div>
+    <div>
+      <div class="title" data-t="title"></div>
+      <div class="sub" data-t="subtitle"></div>
+    </div>
+  </div>
+  <div class="lang"><button id="lang_fa" type="button">فارسی</button><button id="lang_en" type="button">EN</button></div>
+</div>
+
+<!-- 1. Material -->
+<div class="card">
+  <h3><span data-t="sec_material"></span></h3>
+  <div class="seg" id="mat_source">
+    <label><input type="radio" name="mat_source" value="chosen"><span data-t="src_chosen"></span></label>
+    <label><input type="radio" name="mat_source" value="current"><span data-t="src_current"></span></label>
+    <label><input type="radio" name="mat_source" value="existing"><span data-t="src_existing"></span></label>
+  </div>
+  <div id="mat_block">
+    <div class="row"><input type="text" id="mat_filter" style="flex:1" data-tp="filter"></div>
+    <div class="mats" id="mats"></div>
+    <div class="row">
+      <button class="btn" id="b_current" type="button" data-t="btn_current"></button>
+      <button class="btn" id="b_sample" type="button" data-t="btn_sample"></button>
+      <button class="btn" id="b_browse" type="button" data-t="btn_browse"></button>
+    </div>
+  </div>
+  <div class="info" id="mat_info"></div>
+</div>
+
+<!-- 2. Mode -->
+<div class="card">
+  <h3><span data-t="sec_mode"></span></h3>
+  <div class="modes" id="modes"></div>
+  <div id="opt_axis" class="row">
+    <label class="k" data-t="axis"></label>
+    <div class="seg" id="axis">
+      <label><input type="radio" name="axis" value="auto"><span data-t="auto"></span></label>
+      <label><input type="radio" name="axis" value="x"><span>X</span></label>
+      <label><input type="radio" name="axis" value="y"><span>Y</span></label>
+      <label><input type="radio" name="axis" value="z"><span>Z</span></label>
+    </div>
+  </div>
+  <div id="opt_seam" class="row">
+    <label class="k" data-t="seam"></label>
+    <input type="number" id="seam" step="15"> <span>°</span>
+  </div>
+  <div id="opt_planar" class="row">
+    <label class="k" data-t="planar_dir"></label>
+    <div class="seg" id="planar_dir">
+      <label><input type="radio" name="planar_dir" value="normal"><span data-t="dir_normal"></span></label>
+      <label><input type="radio" name="planar_dir" value="camera"><span data-t="dir_camera"></span></label>
+      <label><input type="radio" name="planar_dir" value="z"><span data-t="dir_top"></span></label>
+      <label><input type="radio" name="planar_dir" value="y"><span data-t="dir_front"></span></label>
+      <label><input type="radio" name="planar_dir" value="x"><span data-t="dir_side"></span></label>
+    </div>
+  </div>
+  <label class="chk" id="opt_hard"><input type="checkbox" id="cross_hard"> <span data-t="cross_hard"></span></label>
+  <div class="hint" id="mode_hint"></div>
+</div>
+
+<!-- 3. Size -->
+<div class="card">
+  <h3><span data-t="sec_size"></span></h3>
+  <div class="seg" id="size_mode">
+    <label><input type="radio" name="size_mode" value="real"><span data-t="size_real"></span></label>
+    <label><input type="radio" name="size_mode" value="fit"><span data-t="size_fit"></span></label>
+  </div>
+  <div id="real_opts">
+    <div class="row">
+      <label class="k" data-t="tile"></label>
+      <input type="number" id="tile_w" min="0" step="any"> <span>&times;</span>
+      <input type="number" id="tile_h" min="0" step="any"> <span class="ltr" id="units"></span>
+    </div>
+    <div class="hint" data-t="tile_hint"></div>
+  </div>
+  <div id="fit_opts" class="row">
+    <label class="k" data-t="repeat"></label>
+    <input type="number" id="repeat_u" min="0" step="0.5"> <span>&times;</span>
+    <input type="number" id="repeat_v" min="0" step="0.5">
+  </div>
+</div>
+
+<!-- 4. Adjust -->
+<div class="card">
+  <h3><span data-t="sec_adjust"></span><button class="btn" id="b_zero" type="button" data-t="btn_zero"></button></h3>
+  <div class="row">
+    <label class="k" data-t="scale"></label>
+    <span>U</span>&nbsp;<input type="number" id="scale_u" step="10"> <span>%</span>&nbsp;&nbsp;
+    <span>V</span>&nbsp;<input type="number" id="scale_v" step="10"> <span>%</span>
+  </div>
+  <div class="row">
+    <label class="k" data-t="rotation"></label>
+    <input type="number" id="rotation" step="15"> <span>°</span>&nbsp;
+    <button class="btn" id="b_rot90" type="button">+90°</button>
+  </div>
+  <div class="row">
+    <label class="k" data-t="offset"></label>
+    <span>U</span>&nbsp;<input type="number" id="offset_u" step="0.05">&nbsp;&nbsp;
+    <span>V</span>&nbsp;<input type="number" id="offset_v" step="0.05">
+  </div>
+  <div class="row">
+    <label class="chk" style="margin-inline-end:14px;margin-right:14px"><input type="checkbox" id="flip_u"> <span data-t="flip_u"></span></label>
+    <label class="chk"><input type="checkbox" id="flip_v"> <span data-t="flip_v"></span></label>
+  </div>
+</div>
+
+<!-- 5. Options -->
+<div class="card">
+  <h3><span data-t="sec_options"></span></h3>
+  <div class="row">
+    <label class="k" data-t="sides"></label>
+    <div class="seg" id="sides">
+      <label><input type="radio" name="sides" value="front"><span data-t="side_front"></span></label>
+      <label><input type="radio" name="sides" value="back"><span data-t="side_back"></span></label>
+      <label><input type="radio" name="sides" value="both"><span data-t="side_both"></span></label>
+    </div>
+  </div>
+  <div class="row">
+    <label class="k" data-t="tool_scope"></label>
+    <div class="seg" id="tool_scope">
+      <label><input type="radio" name="tool_scope" value="surface"><span data-t="scope_surface"></span></label>
+      <label><input type="radio" name="tool_scope" value="face"><span data-t="scope_face"></span></label>
+      <label><input type="radio" name="tool_scope" value="object"><span data-t="scope_object"></span></label>
+    </div>
+  </div>
+  <label class="chk"><input type="checkbox" id="expand"> <span data-t="expand"></span></label>
+  <label class="chk"><input type="checkbox" id="allow_distort"> <span data-t="allow_distort"></span></label>
+  <details style="margin-top:6px">
+    <summary data-t="help_title"></summary>
+    <ul class="tips hint" id="tips"></ul>
+  </details>
+</div>
+<div class="hint" style="text-align:center" id="footer"></div>
+
+<div class="bar">
+  <div class="selinfo" id="selinfo"></div>
+  <div class="acts">
+    <button class="btn pri" id="b_apply" type="button" data-t="btn_apply"></button>
+    <button class="btn" id="b_tool" type="button" data-t="btn_tool"></button>
+    <button class="btn" id="b_detect" type="button" data-t="btn_detect"></button>
+    <button class="btn" id="b_reset" type="button" data-t="btn_reset"></button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+(function () {
+  var I18N = {
+    en: {
+      title: 'Banian Material UV', subtitle: 'Texture mapping for curved surfaces',
+      sec_material: '1. Material', src_chosen: 'Pick from list', src_current: 'Paint Bucket material', src_existing: 'Keep existing material',
+      filter: 'Search materials...', btn_current: 'Use Paint Bucket', btn_sample: 'Sample from selection', btn_browse: 'Load image...',
+      no_mats: 'This model has no materials yet. Load an image or add one from the Materials panel.',
+      mi_none: 'No material chosen.', mi_tex: 'Texture size', mi_color: 'Color only (no texture): faces will simply be painted.',
+      mi_current: 'The material active in the Paint Bucket will be used', mi_existing: 'Each face keeps its own material; only its UV mapping is fixed.',
+      sec_mode: '2. Mapping method', axis: 'Axis', auto: 'Auto', seam: 'Seam angle', planar_dir: 'Project from',
+      dir_normal: 'Average normal', dir_camera: 'Camera view', dir_top: 'Top', dir_front: 'Front', dir_side: 'Side',
+      cross_hard: 'Unfold across hard edges too',
+      m_auto: 'Auto (smart)', d_auto: 'Detects sphere, cylinder, developable, quad mesh or flat and picks the best method.',
+      m_natural: 'Natural / Unfold', d_natural: 'Unfolds face to face with zero stretch. Curved walls, arches, cones, bent panels.',
+      m_quad: 'Quad grid', d_quad: 'Texture follows the rows/columns of the mesh. Torus, pipes, sweeps, organic quads.',
+      m_cylindrical: 'Cylindrical', d_cylindrical: 'Wraps around an axis with one clean seam. Columns, pipes, cans, round walls.',
+      m_spherical: 'Spherical', d_spherical: 'Latitude/longitude wrap. Spheres, domes, balls, globes.',
+      m_box: 'Box / Tri-planar', d_box: 'Projects from X, Y and Z depending on each face. Rounded boxes, furniture, organic.',
+      m_planar: 'Planar projection', d_planar: 'One straight projection. Terrain, carpets, decals, flat-ish surfaces.',
+      sec_size: '3. Texture size', size_real: 'Real-world size', size_fit: 'Fit to object',
+      tile: 'Tile size', tile_hint: 'Leave 0 to use the size stored in the material. One value keeps the aspect ratio.',
+      repeat: 'Repeat (U × V)',
+      sec_adjust: '4. Adjust', btn_zero: 'Reset values', scale: 'Scale', rotation: 'Rotation', offset: 'Offset',
+      flip_u: 'Flip horizontal', flip_v: 'Flip vertical',
+      sec_options: '5. Options', sides: 'Paint side', side_front: 'Front', side_back: 'Back', side_both: 'Both',
+      tool_scope: 'Tool click', scope_surface: 'Surface', scope_face: 'Single face', scope_object: 'Whole object',
+      expand: 'Expand selected faces to their whole smooth surface',
+      allow_distort: 'Allow 4-point (distorted) mapping on quads (best fit)',
+      help_title: 'Tips',
+      tips: ['Select faces, groups or components and press Apply. Groups/components are processed inside, nothing is exploded.',
+             'UV Paint Tool: click a surface. Shift = one face, Ctrl = whole object, Alt = pick material.',
+             'Sphere/dome: Spherical (globe image: Fit 1×1). Tiles on a dome: Quad grid or Natural.',
+             'Column, pipe, round wall: Cylindrical. Arch, bent wall, cone: Natural.',
+             'Every apply is one undo step (Ctrl+Z).', 'Texture looks mirrored inside a dome or pipe? Use Flip horizontal.'],
+      btn_apply: 'Apply to selection', btn_tool: 'Paint tool', btn_detect: 'Detect', btn_reset: 'Reset UV',
+      sel: 'Selection: {f} faces ({o} groups/components) - {t} faces to map', sel_none: 'Nothing selected',
+      r_done: 'Done: {n} faces mapped', r_skipped: ', {n} skipped', r_modes: 'Method used: ', r_notex: ' (material has no texture: painted only)',
+      r_reset: 'Texture position reset on {n} faces', r_detect: 'Suggested method: ',
+      e_nothing: 'Select faces, groups or components first.', e_no_material: 'Choose a material first.', e_no_sample: 'The selection has no material to sample.',
+      footer: 'Banian Studio · v'
+    },
+    fa: {
+      title: 'بانیان متریال یو‌وی', subtitle: 'متریال‌دهی درست روی سطوح منحنی',
+      sec_material: '۱. متریال', src_chosen: 'انتخاب از لیست', src_current: 'متریال سطل رنگ', src_existing: 'متریال فعلی صفحه‌ها',
+      filter: 'جستجوی متریال...', btn_current: 'متریال سطل رنگ', btn_sample: 'برداشتن از انتخاب', btn_browse: 'بارگذاری تصویر...',
+      no_mats: 'این مدل هنوز متریالی ندارد. یک تصویر بارگذاری کنید یا از پنل Materials اضافه کنید.',
+      mi_none: 'متریالی انتخاب نشده است.', mi_tex: 'اندازه بافت', mi_color: 'فقط رنگ (بدون بافت): صفحه‌ها فقط رنگ می‌شوند.',
+      mi_current: 'متریالی که الان در سطل رنگ (Paint Bucket) فعال است استفاده می‌شود', mi_existing: 'متریال هر صفحه همان می‌ماند و فقط نگاشت UV آن درست می‌شود.',
+      sec_mode: '۲. روش نگاشت', axis: 'محور', auto: 'خودکار', seam: 'زاویه درز', planar_dir: 'جهت تابش',
+      dir_normal: 'میانگین نرمال', dir_camera: 'دید دوربین', dir_top: 'بالا', dir_front: 'روبه‌رو', dir_side: 'کنار',
+      cross_hard: 'باز کردن از روی لبه‌های سخت هم انجام شود',
+      m_auto: 'خودکار (هوشمند)', d_auto: 'کره، استوانه، سطح گسترش‌پذیر، مش چهارضلعی یا صفحه تخت را تشخیص می‌دهد و بهترین روش را انتخاب می‌کند.',
+      m_natural: 'طبیعی / باز کردن', d_natural: 'صفحه به صفحه بدون کشیدگی باز می‌کند. دیوار منحنی، قوس، مخروط، پنل خم‌شده.',
+      m_quad: 'شبکه چهارضلعی', d_quad: 'بافت ردیف و ستون‌های مش را دنبال می‌کند. چنبره، لوله، Sweep، احجام آزاد.',
+      m_cylindrical: 'استوانه‌ای', d_cylindrical: 'دور یک محور می‌پیچد و فقط یک درز دارد. ستون، لوله، قوطی، دیوار گرد.',
+      m_spherical: 'کروی', d_spherical: 'پیچش طول و عرض جغرافیایی. کره، گنبد، توپ، کره زمین.',
+      m_box: 'جعبه‌ای / سه‌جهته', d_box: 'بسته به جهت هر صفحه از X، Y یا Z می‌تاباند. مبلمان، جعبه گردگوشه، احجام آزاد.',
+      m_planar: 'تابش صفحه‌ای', d_planar: 'یک تابش مستقیم. زمین و توپوگرافی، فرش، برچسب، سطوح تقریباً تخت.',
+      sec_size: '۳. اندازه بافت', size_real: 'اندازه واقعی', size_fit: 'جا شدن روی حجم',
+      tile: 'اندازه کاشی', tile_hint: 'صفر یعنی همان اندازه‌ای که در متریال ذخیره شده. اگر فقط یکی را وارد کنید نسبت حفظ می‌شود.',
+      repeat: 'تکرار (U × V)',
+      sec_adjust: '۴. تنظیمات', btn_zero: 'صفر کردن', scale: 'مقیاس', rotation: 'چرخش', offset: 'جابه‌جایی',
+      flip_u: 'آینه افقی', flip_v: 'آینه عمودی',
+      sec_options: '۵. گزینه‌ها', sides: 'وجه رنگ', side_front: 'رو', side_back: 'پشت', side_both: 'هر دو',
+      tool_scope: 'کلیک ابزار', scope_surface: 'کل سطح', scope_face: 'یک صفحه', scope_object: 'کل آبجکت',
+      expand: 'صفحه‌های انتخاب‌شده تا کل سطح نرم (Smooth) گسترش پیدا کنند',
+      allow_distort: 'نگاشت ۴ نقطه‌ای (Distort) روی چهارضلعی‌ها مجاز باشد (دقیق‌تر)',
+      help_title: 'راهنما',
+      tips: ['صفحه، گروه یا کامپوننت را انتخاب کنید و «اعمال» را بزنید. داخل گروه‌ها پردازش می‌شود و چیزی Explode نمی‌شود.',
+             'ابزار رنگ UV: روی سطح کلیک کنید. Shift = یک صفحه، Ctrl = کل آبجکت، Alt = برداشتن متریال.',
+             'کره و گنبد: کروی (برای تصویر کره زمین: جا شدن ۱×۱). کاشی روی گنبد: شبکه چهارضلعی یا طبیعی.',
+             'ستون، لوله، دیوار گرد: استوانه‌ای. قوس، دیوار خم‌شده، مخروط: طبیعی.',
+             'هر اعمال یک مرحله Undo است (Ctrl+Z).', 'بافت داخل گنبد یا لوله برعکس است؟ آینه افقی را بزنید.'],
+      btn_apply: 'اعمال روی انتخاب', btn_tool: 'ابزار رنگ', btn_detect: 'تشخیص', btn_reset: 'ریست UV',
+      sel: 'انتخاب: {f} صفحه ({o} گروه/کامپوننت) - {t} صفحه برای نگاشت', sel_none: 'چیزی انتخاب نشده',
+      r_done: 'انجام شد: {n} صفحه نگاشت شد', r_skipped: '، {n} صفحه رد شد', r_modes: 'روش استفاده‌شده: ', r_notex: ' (متریال بافت ندارد: فقط رنگ شد)',
+      r_reset: 'موقعیت بافت {n} صفحه ریست شد', r_detect: 'روش پیشنهادی: ',
+      e_nothing: 'اول صفحه، گروه یا کامپوننت را انتخاب کنید.', e_no_material: 'اول یک متریال انتخاب کنید.', e_no_sample: 'انتخاب فعلی متریالی برای برداشتن ندارد.',
+      footer: 'Banian Studio · نسخه '
+    }
+  };
+
+  var ICONS = {
+    auto: '<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#1d6f5f" stroke-width="2"/><path d="M14 6l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#e0a526"/></svg>',
+    natural: '<svg viewBox="0 0 28 28"><path d="M3 20 Q14 4 25 20" fill="none" stroke="#1d6f5f" stroke-width="2"/><path d="M3 24h22" stroke="#e0a526" stroke-width="2"/><path d="M8 13v11M14 9v15M20 13v11" stroke="#9cc9be" stroke-width="1"/></svg>',
+    quad: '<svg viewBox="0 0 28 28"><path d="M4 8 Q14 2 24 8 V22 Q14 16 4 22Z" fill="#e5f3ef" stroke="#1d6f5f" stroke-width="2"/><path d="M9 6v14M14 5v13M19 6v14M4 15 Q14 9 24 15" stroke="#1d6f5f" stroke-width="1"/></svg>',
+    cylindrical: '<svg viewBox="0 0 28 28"><ellipse cx="14" cy="6" rx="8" ry="3" fill="none" stroke="#1d6f5f" stroke-width="2"/><path d="M6 6v16M22 6v16" stroke="#1d6f5f" stroke-width="2"/><path d="M6 22a8 3 0 0016 0" fill="none" stroke="#1d6f5f" stroke-width="2"/><path d="M10 9v15M14 9v16M18 9v15" stroke="#e0a526" stroke-width="1"/></svg>',
+    spherical: '<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#1d6f5f" stroke-width="2"/><ellipse cx="14" cy="14" rx="4" ry="10" fill="none" stroke="#e0a526" stroke-width="1"/><path d="M4 14h20M6 9h16M6 19h16" stroke="#e0a526" stroke-width="1"/></svg>',
+    box: '<svg viewBox="0 0 28 28"><path d="M5 9l9-5 9 5v10l-9 5-9-5z" fill="#e5f3ef" stroke="#1d6f5f" stroke-width="2"/><path d="M5 9l9 5 9-5M14 14v10" stroke="#1d6f5f" stroke-width="1.5" fill="none"/></svg>',
+    planar: '<svg viewBox="0 0 28 28"><path d="M3 19l8-5 14 3-8 6z" fill="#e5f3ef" stroke="#1d6f5f" stroke-width="2"/><path d="M14 3v12M10 6v9M18 6v10" stroke="#e0a526" stroke-width="1.5"/></svg>'
+  };
+  var MODES = ['auto', 'natural', 'quad', 'cylindrical', 'spherical', 'box', 'planar'];
+
+  var S = {}; var MATS = []; var CURRENT = null; var LANG = 'fa'; var UNITS = 'm'; var VERSION = ''; var SEL = null;
+  var NUMS = ['tile_w', 'tile_h', 'repeat_u', 'repeat_v', 'scale_u', 'scale_v', 'rotation', 'seam', 'offset_u', 'offset_v'];
+  var CHKS = ['flip_u', 'flip_v', 'allow_distort', 'cross_hard', 'expand'];
+  var RADIOS = ['mat_source', 'axis', 'planar_dir', 'size_mode', 'sides', 'tool_scope'];
+
+  function $(id) { return document.getElementById(id); }
+  function t(k) { var d = I18N[LANG] || I18N.en; return d[k] !== undefined ? d[k] : (I18N.en[k] !== undefined ? I18N.en[k] : k); }
+  function fmt(s, o) { for (var k in o) { if (o.hasOwnProperty(k)) s = s.split('{' + k + '}').join(o[k]); } return s; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function on(el, ev, fn) { if (el.addEventListener) el.addEventListener(ev, fn, false); else el.attachEvent('on' + ev, fn); }
+
+  function call(name, obj) {
+    var s = JSON.stringify(obj || {});
+    if (window.sketchup && typeof window.sketchup[name] === 'function') {
+      window.sketchup[name](s);
+    } else {
+      $('bmuv_payload').value = s;
+      window.location.href = 'skp:' + name + '@';
+    }
+  }
+
+  function collect() {
+    var i, el;
+    for (i = 0; i < NUMS.length; i++) { el = $(NUMS[i]); var v = parseFloat(el.value); S[NUMS[i]] = isNaN(v) ? 0 : v; }
+    for (i = 0; i < CHKS.length; i++) { S[CHKS[i]] = !!$(CHKS[i]).checked; }
+    for (i = 0; i < RADIOS.length; i++) {
+      var ins = $(RADIOS[i]).getElementsByTagName('input');
+      for (var j = 0; j < ins.length; j++) { if (ins[j].checked) S[RADIOS[i]] = ins[j].value; }
+    }
+    S.lang = LANG;
+    return S;
+  }
+
+  var saveTimer = null;
+  function save() {
+    collect(); refreshUI();
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { call('save', { settings: S }); }, 350);
+  }
+
+  function setRadio(group, val) {
+    var ins = $(group).getElementsByTagName('input');
+    for (var j = 0; j < ins.length; j++) {
+      ins[j].checked = ins[j].value === String(val);
+      ins[j].parentNode.className = ins[j].checked ? 'on' : '';
+    }
+  }
+
+  function fill() {
+    var i;
+    for (i = 0; i < NUMS.length; i++) $(NUMS[i]).value = S[NUMS[i]] !== undefined ? S[NUMS[i]] : 0;
+    for (i = 0; i < CHKS.length; i++) $(CHKS[i]).checked = !!S[CHKS[i]];
+    for (i = 0; i < RADIOS.length; i++) setRadio(RADIOS[i], S[RADIOS[i]]);
+  }
+
+  function applyLang() {
+    document.documentElement.setAttribute('dir', LANG === 'fa' ? 'rtl' : 'ltr');
+    document.documentElement.setAttribute('lang', LANG);
+    var els = document.querySelectorAll('[data-t]');
+    for (var i = 0; i < els.length; i++) els[i].innerHTML = esc(t(els[i].getAttribute('data-t')));
+    var ph = document.querySelectorAll('[data-tp]');
+    for (i = 0; i < ph.length; i++) ph[i].setAttribute('placeholder', t(ph[i].getAttribute('data-tp')));
+    $('lang_fa').className = LANG === 'fa' ? 'on' : '';
+    $('lang_en').className = LANG === 'en' ? 'on' : '';
+    var tips = t('tips'), h = '';
+    for (i = 0; i < tips.length; i++) h += '<li>' + esc(tips[i]) + '</li>';
+    $('tips').innerHTML = h;
+    $('footer').innerHTML = esc(t('footer') + VERSION);
+    renderModes(); renderMats(); refreshUI(); renderSel();
+  }
+
+  function renderModes() {
+    var h = '';
+    for (var i = 0; i < MODES.length; i++) {
+      var m = MODES[i];
+      h += '<div class="mode' + (S.mode === m ? ' on' : '') + '" data-mode="' + m + '">' + ICONS[m] +
+        '<div><b>' + esc(t('m_' + m)) + '</b><span>' + esc(t('d_' + m)) + '</span></div></div>';
+    }
+    $('modes').innerHTML = h;
+    var cards = $('modes').childNodes;
+    for (var j = 0; j < cards.length; j++) {
+      (function (c) { on(c, 'click', function () { S.mode = c.getAttribute('data-mode'); renderModes(); save(); }); })(cards[j]);
+    }
+  }
+
+  function findMat(name) { for (var i = 0; i < MATS.length; i++) if (MATS[i].name === name) return MATS[i]; return null; }
+
+  function renderMats() {
+    var f = ($('mat_filter').value || '').toLowerCase(), h = '';
+    if (!MATS.length) { $('mats').innerHTML = '<div class="hint" style="padding:6px">' + esc(t('no_mats')) + '</div>'; return; }
+    for (var i = 0; i < MATS.length; i++) {
+      var m = MATS[i];
+      if (f && String(m.label).toLowerCase().indexOf(f) < 0) continue;
+      var bg = m.thumb ? 'background-image:url(' + m.thumb + ');' : '';
+      h += '<div class="mat' + (S.material === m.name ? ' on' : '') + '" data-i="' + i + '" title="' + esc(m.label) + '">' +
+        '<div class="sw" style="background-color:' + m.color + ';' + bg + '">' + (m.textured ? '<span class="tx">UV</span>' : '') + '</div>' +
+        '<div class="mname">' + esc(m.label) + '</div></div>';
+    }
+    $('mats').innerHTML = h;
+    var items = $('mats').childNodes;
+    for (var j = 0; j < items.length; j++) {
+      (function (c) {
+        on(c, 'click', function () { var m = MATS[parseInt(c.getAttribute('data-i'), 10)]; S.material = m.name; S.mat_source = 'chosen'; setRadio('mat_source', 'chosen'); renderMats(); save(); });
+      })(items[j]);
+    }
+  }
+
+  function matInfo() {
+    var src = S.mat_source, m = null;
+    if (src === 'existing') return esc(t('mi_existing'));
+    if (src === 'current') { m = findMat(CURRENT); if (!m) return esc(t('mi_current')) + ': -'; }
+    else m = findMat(S.material);
+    if (!m) return esc(t('mi_none'));
+    var s = (src === 'current' ? esc(t('mi_current')) + ': ' : '') + '<b class="ltr">' + esc(m.label) + '</b> — ';
+    if (m.textured) s += esc(t('mi_tex')) + ': <span class="ltr">' + m.tw + ' × ' + m.th + ' ' + UNITS + '</span>';
+    else s += esc(t('mi_color'));
+    return s;
+  }
+
+  function show(id, v) { $(id).className = $(id).className.replace(/\s*hide/g, '') + (v ? '' : ' hide'); }
+
+  function refreshUI() {
+    var i;
+    for (i = 0; i < RADIOS.length; i++) setRadio(RADIOS[i], S[RADIOS[i]]);
+    show('mat_block', S.mat_source === 'chosen');
+    $('mat_info').innerHTML = matInfo();
+    var m = S.mode;
+    show('opt_axis', m === 'cylindrical' || m === 'spherical');
+    show('opt_seam', m === 'cylindrical' || m === 'spherical' || m === 'auto');
+    show('opt_planar', m === 'planar');
+    show('opt_hard', m === 'natural');
+    $('mode_hint').innerHTML = '';
+    show('real_opts', S.size_mode !== 'fit');
+    show('fit_opts', S.size_mode === 'fit');
+    $('units').innerHTML = esc(UNITS);
+  }
+
+  function renderSel() {
+    if (!SEL) { $('selinfo').innerHTML = ''; return; }
+    if (!SEL.faces && !SEL.objects) { $('selinfo').innerHTML = esc(t('sel_none')); return; }
+    $('selinfo').innerHTML = esc(fmt(t('sel'), { f: SEL.faces, o: SEL.objects, t: SEL.total }));
+  }
+
+  function status(msg, ok) { var el = $('status'); el.innerHTML = esc(msg); el.className = 'status ' + (ok ? 'ok' : 'err'); }
+
+  function showResult(r) {
+    if (!r) return;
+    if (!r.ok) { status(t('e_' + r.error), false); return; }
+    if (r.reset !== undefined) { status(fmt(t('r_reset'), { n: r.reset }), true); return; }
+    if (r.detected) {
+      var names = [], seen = {};
+      for (var i = 0; i < r.detected.length; i++) { if (!seen[r.detected[i]]) { seen[r.detected[i]] = 1; names.push(t('m_' + r.detected[i])); } }
+      status(t('r_detect') + names.join('، '), true); return;
+    }
+    var s = fmt(t('r_done'), { n: r.faces });
+    if (r.skipped) s += fmt(t('r_skipped'), { n: r.skipped });
+    var ms = [];
+    for (var k in r.modes) { if (r.modes.hasOwnProperty(k)) ms.push(t('m_' + k)); }
+    if (ms.length) s += ' — ' + t('r_modes') + ms.join('، ');
+    if (r.no_texture) s += t('r_notex');
+    status(s, true);
+  }
+
+  window.BMUV = {
+    receive: function (st) {
+      S = st.settings || S; MATS = st.materials || []; CURRENT = st.current; UNITS = st.units || UNITS;
+      VERSION = st.version || VERSION; SEL = st.selection; LANG = S.lang === 'en' ? 'en' : 'fa';
+      fill(); applyLang(); showResult(st.result);
+    },
+    selection: function (sel) { SEL = sel; renderSel(); }
+  };
+
+  function bind() {
+    var i, el;
+    for (i = 0; i < NUMS.length; i++) { on($(NUMS[i]), 'change', save); on($(NUMS[i]), 'keyup', save); }
+    for (i = 0; i < CHKS.length; i++) on($(CHKS[i]), 'click', save);
+    for (i = 0; i < RADIOS.length; i++) {
+      var ins = $(RADIOS[i]).getElementsByTagName('input');
+      for (var j = 0; j < ins.length; j++) on(ins[j], 'click', save);
+    }
+    on($('mat_filter'), 'keyup', renderMats);
+    on($('lang_fa'), 'click', function () { LANG = 'fa'; applyLang(); save(); });
+    on($('lang_en'), 'click', function () { LANG = 'en'; applyLang(); save(); });
+    on($('b_current'), 'click', function () { call('current', { settings: collect() }); });
+    on($('b_sample'), 'click', function () { call('sample', { settings: collect() }); });
+    on($('b_browse'), 'click', function () { call('browse', { settings: collect() }); });
+    on($('b_apply'), 'click', function () { status('...', true); call('apply', { settings: collect() }); });
+    on($('b_tool'), 'click', function () { call('tool', { settings: collect() }); });
+    on($('b_detect'), 'click', function () { call('detect', { settings: collect() }); });
+    on($('b_reset'), 'click', function () { call('reset', { settings: collect() }); });
+    on($('b_rot90'), 'click', function () { var r = (parseFloat($('rotation').value) || 0) + 90; if (r >= 360) r -= 360; $('rotation').value = r; save(); });
+    on($('b_zero'), 'click', function () {
+      $('scale_u').value = 100; $('scale_v').value = 100; $('rotation').value = 0; $('offset_u').value = 0; $('offset_v').value = 0;
+      $('seam').value = 0; $('flip_u').checked = false; $('flip_v').checked = false; save();
+    });
+  }
+
+  function init() {
+    S = { mode: 'auto', mat_source: 'chosen', size_mode: 'real', sides: 'front', axis: 'auto', planar_dir: 'normal', tool_scope: 'surface' };
+    bind(); applyLang();
+    call('ready', {});
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(init, 0);
+  else on(window, 'load', init);
+})();
+</script>
+</body>
+</html>

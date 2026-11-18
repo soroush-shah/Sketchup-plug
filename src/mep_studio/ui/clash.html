@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Clash Report</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1d2330;--mut:#6b7280;--line:#e3e6eb;--hard:#d92d20;--soft:#e8a100;--acc:#2563eb}
+*{box-sizing:border-box}body{margin:0;font:13px/1.4 "Segoe UI",Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0}
+h1{font-size:15px;margin:0 12px 0 0}.pill{padding:2px 8px;border-radius:10px;font-weight:600;font-size:12px}
+.h{background:#fde8e6;color:var(--hard)}.s{background:#fff4d6;color:#9a6a00}
+button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer}button:hover{border-color:var(--acc);color:var(--acc)}
+.sp{flex:1}select,input{border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+table{width:100%;border-collapse:collapse;background:var(--card)}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{position:sticky;top:49px;background:#eef1f5;font-weight:600;font-size:12px}tr:hover td{background:#f3f7ff}
+.tag{color:var(--mut);font-size:11px}.empty{padding:40px;text-align:center;color:var(--mut)}
+</style></head><body>
+<header><h1>Clash report / گزارش تداخل</h1>
+<span id="cH" class="pill h"></span><span id="cS" class="pill s"></span><span id="t" class="tag"></span>
+<span class="sp"></span>
+<select id="f"><option value="">All / همه</option><option>Hard</option><option>Soft</option><option value="MEP">vs MEP</option><option value="Arch/Struct">vs Arch/Struct</option></select>
+<input id="q" placeholder="filter / جستجو" size="14">
+<button onclick="sketchup.rerun()">Re-run</button><button onclick="sketchup.export()">Export CSV</button><button onclick="sketchup.clear()">Clear markers</button>
+</header>
+<div id="out"></div>
+<script>
+var D=/*DATA*/null;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function render(){var f=document.getElementById('f').value,q=document.getElementById('q').value.toLowerCase();
+var rows=D.rows.filter(function(r){if(f&&r.kind!==f&&r.vs!==f)return false;if(q&&(r.a+' '+r.b+' '+r.a_layer+' '+r.b_layer).toLowerCase().indexOf(q)<0)return false;return true});
+var hard=D.rows.filter(function(r){return r.kind==='Hard'}).length;
+document.getElementById('cH').textContent='Hard: '+hard;document.getElementById('cS').textContent='Soft: '+(D.rows.length-hard);
+document.getElementById('t').textContent=D.seconds+' s';
+if(!rows.length){document.getElementById('out').innerHTML='<div class="empty">No clashes 🎉 / تداخلی یافت نشد</div>';return}
+var h='<table><tr><th>#</th><th>Type</th><th>Element A</th><th>Element B</th><th>X / Y / Z (mm)</th><th></th></tr>';
+rows.forEach(function(r){h+='<tr><td>C'+r.no+'</td><td><span class="pill '+(r.kind==='Hard'?'h':'s')+'">'+r.kind+'</span><div class="tag">vs '+esc(r.vs)+'</div></td><td>'+esc(r.a)+'<div class="tag">'+esc(r.a_layer)+'</div></td><td>'+esc(r.b)+'<div class="tag">'+esc(r.b_layer)+'</div></td><td>'+r.x+' / '+r.y+' / '+r.z+'</td><td><button onclick="sketchup.zoom('+r.no+')">Zoom</button></td></tr>'});
+document.getElementById('out').innerHTML=h+'</table>'}
+document.getElementById('f').onchange=render;document.getElementById('q').oninput=render;render();
+</script></body></html>

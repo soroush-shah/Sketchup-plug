@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>BOQ</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:13px/1.4 "Segoe UI",Tahoma,Arial,sans-serif;background:#f6f7f9;color:#1d2330}
+header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid #e3e6eb;position:sticky;top:0}
+h1{font-size:15px;margin:0}.sp{flex:1}button{border:1px solid #e3e6eb;background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:6px 8px;border-bottom:1px solid #e3e6eb;text-align:left}
+th{background:#eef1f5;font-size:12px;position:sticky;top:47px}td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.g td{background:#f0f3f8;font-weight:600}
+</style></head><body>
+<header><h1>Bill of quantities / متره و برآورد</h1><span class="sp"></span><button onclick="sketchup.export()">Export CSV</button></header>
+<div id="out"></div>
+<script>
+var D=/*DATA*/null;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+var h='<table><tr><th>Type</th><th>System</th><th>Size / Model</th><th class="n">Qty</th><th>Unit</th><th class="n">Sheet metal m²</th><th class="n">Pieces</th></tr>',last='';
+D.forEach(function(r){if(r.type!==last){h+='<tr class="g"><td colspan="7">'+esc(r.type.toUpperCase())+'</td></tr>';last=r.type}
+h+='<tr><td>'+esc(r.type)+'</td><td>'+esc(r.label)+'</td><td>'+esc(r.size)+'</td><td class="n">'+r.qty+'</td><td>'+r.unit+'</td><td class="n">'+(r.area||'')+'</td><td class="n">'+r.pieces+'</td></tr>'});
+document.getElementById('out').innerHTML=h+'</table>';
+</script></body></html>

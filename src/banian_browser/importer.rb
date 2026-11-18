@@ -184,7 +184,7 @@ module BanianStudio
           size = File.size(path)
           f = File.open(path, 'rb')
           timer = nil
-          timer = UI.start_timer(0.005, true) do
+          timer = UI.start_timer(0.02, true) do
             begin
               data = f.read(CHUNK) || ''.b
               last = f.eof?
@@ -373,19 +373,89 @@ module BanianStudio
           true
         end
 
+        # Building runs in short timer slices (one operation, one undo step) so SketchUp
+        # stays responsive with big models; the dialog shows progress ('build') and is
+        # told when it is done ('built').
         def cmd_finish(a)
           ctx = @ctx
           opts = a['options'] || {}
-          res = case ctx['mode']
-                when 'file' then build_import(@import_meta, @incoming, opts)
-                when 'skp', 'simplify' then apply_simplify(@incoming, opts)
-                end
-          ctx['done'] = true
-          if ctx['mode'] == 'skp' && ctx['definition'].valid?
-            model.select_tool(PlaceTool.new(ctx['definition']))
-          end
+          incoming = @incoming
           @incoming = {}
-          res
+          ctx['done'] = true
+          case ctx['mode']
+          when 'file'
+            build_import(@import_meta, incoming, opts) { |res| emit('built', res) }
+          when 'skp', 'simplify'
+            apply_simplify(incoming, opts) do |res|
+              model.select_tool(PlaceTool.new(ctx['definition'])) if ctx['mode'] == 'skp' && ctx['definition'].valid?
+              emit('built', res)
+            end
+          end
+          { 'async' => true }
+        end
+
+        JOB_SLICE = 0.08
+        JOB_INTERVAL = 0.03
+
+        def run_jobs(label, jobs, &done)
+          stop_jobs
+          @job_list = jobs
+          @jobs_done = 0
+          model.start_operation(label, true)
+          @job_timer = UI.start_timer(JOB_INTERVAL, true) { job_tick(done) }
+        end
+
+        def stop_jobs
+          UI.stop_timer(@job_timer) if @job_timer
+          @job_timer = nil
+        end
+
+        # jobs may queue more jobs (the import builds its structure first)
+        def job_tick(done)
+          return if @job_busy
+          @job_busy = true
+          begin
+            t0 = Time.now
+            while (job = @job_list.shift)
+              job.call
+              @jobs_done += 1
+              break if Time.now - t0 > JOB_SLICE
+            end
+            frac = @jobs_done.to_f / (@jobs_done + @job_list.length)
+            emit('build', 'p' => frac)
+            Sketchup.status_text = "Banian: #{(frac * 100).round}%"
+            if @job_list.empty?
+              stop_jobs
+              model.commit_operation
+              Sketchup.status_text = ''
+              done.call
+            end
+          rescue StandardError => e
+            stop_jobs
+            @job_list = []
+            model.abort_operation
+            Util.log_error(e, 'build')
+            emit('build_error', 'error' => e.message)
+          ensure
+            @job_busy = false
+          end
+        end
+
+        # A construction point keeps a new group / definition from being cleaned up as
+        # empty until its geometry arrives in a later slice.
+        def hold(ents)
+          cp = ents.add_cpoint(ORIGIN)
+          @holders << cp
+          cp
+        end
+
+        def queue_parts(jobs, ents, parts, mats, flags, holder, scale = 1.0)
+          (parts || []).each do |part|
+            jobs << lambda do
+              holder.erase! if holder && holder.valid?
+              add_parts(ents, [part], mats, flags, scale)
+            end
+          end
         end
 
         def smooth_flags(opts)
@@ -458,35 +528,50 @@ module BanianStudio
         end
 
         # ---- import from file ------------------------------------------------------------------
-        def build_import(meta, geoms, opts)
+        def build_import(meta, geoms, opts, &done)
           meta ||= {}
           path = @ctx['path'].to_s
           name = File.basename(path, '.*')
           k = (meta['buildScale'] || 1).to_f
           k = 1.0 if k <= 0
-          faces = 0
+          jobs = []
+          @holders = []
+          groups = []
           root = nil
-          model.start_operation(I18n.t(:op_import), true)
-          begin
+          # structure first (fast), geometry as slices
+          setup = lambda do
             mats = make_materials(meta['materials'] || [], opts)
             flags = smooth_flags(opts)
             uses = Hash.new(0)
             count_uses(meta['nodes'] || [], uses)
             defs = {}
             root = model.definitions.add(name)
+            hold(root.entities)
             (meta['nodes'] || []).each do |n|
-              faces += build_node(root.entities, n, geoms, mats, flags, defs, uses, opts, k)
+              build_node(root.entities, n, geoms, mats, flags, defs, uses, opts, k, jobs, groups)
             end
-            root.set_attribute(DICT, 'source', path)
-            model.commit_operation
-          rescue StandardError => e
-            model.abort_operation
-            raise e
+            jobs << lambda do
+              @holders.each { |cp| cp.erase! if cp.valid? }
+              groups.reverse_each { |g| g.erase! if g.valid? && g.entities.length.zero? }
+              root.set_attribute(DICT, 'source', path)
+            end
           end
-          Settings.record_use(path)
-          ModelOps.last_definition = root
-          model.select_tool(PlaceTool.new(root)) if root.entities.length > 0
-          { 'faces' => faces }
+          jobs << setup
+          run_jobs(I18n.t(:op_import), jobs) do
+            Settings.record_use(path)
+            ModelOps.last_definition = root
+            model.select_tool(PlaceTool.new(root)) if root && root.valid? && root.entities.length > 0
+            done.call('faces' => root && root.valid? ? count_tree(root, {}) : 0)
+          end
+        end
+
+        def count_tree(d, memo)
+          return memo[d] if memo.key?(d)
+          n = d.entities.grep(Sketchup::Face).length
+          d.entities.each do |e|
+            n += count_tree(Util.definition_of(e), memo) if e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          end
+          memo[d] = n
         end
 
         def count_uses(nodes, uses)
@@ -501,47 +586,42 @@ module BanianStudio
           Geom::Transformation.new(arr.map(&:to_f))
         end
 
-        def build_node(ents, node, geoms, mats, flags, defs, uses, opts, k)
+        def build_node(ents, node, geoms, mats, flags, defs, uses, opts, k, jobs, groups)
           tr = transformation(node['m'])
           key = node['g']
           kids = node['c'] || []
-          faces = 0
           shared = key && uses[key] > 1 && opts['components'] != false
           if key && kids.empty? && shared
-            d = definition_for(key, node, geoms, mats, flags, defs, k)
+            d = definition_for(key, node, geoms, mats, flags, defs, k, jobs)
             inst = ents.add_instance(d, tr * scale_tr(k))
             inst.name = Util.utf8(node['n'].to_s)
-            return count_faces(d)
+            return
           end
           grp = ents.add_group
+          holder = hold(grp.entities)
           grp.name = Util.utf8(node['n'].to_s)
+          grp.transformation = tr
+          groups << grp
           if key
             if shared || k != 1.0
-              d = definition_for(key, node, geoms, mats, flags, defs, k)
+              d = definition_for(key, node, geoms, mats, flags, defs, k, jobs)
               grp.entities.add_instance(d, scale_tr(k))
-              faces += count_faces(d)
             else
-              add_parts(grp.entities, geoms[key] || [], mats, flags)
-              faces += grp.entities.grep(Sketchup::Face).length
+              queue_parts(jobs, grp.entities, geoms[key], mats, flags, holder)
             end
           end
-          kids.each { |c| faces += build_node(grp.entities, c, geoms, mats, flags, defs, uses, opts, k) }
-          if grp.entities.length.zero?
-            grp.erase!
-          else
-            grp.transformation = tr
-          end
-          faces
+          kids.each { |c| build_node(grp.entities, c, geoms, mats, flags, defs, uses, opts, k, jobs, groups) }
         end
 
         def scale_tr(k)
           k == 1.0 ? Geom::Transformation.new : Geom::Transformation.scaling(1.0 / k)
         end
 
-        def definition_for(key, node, geoms, mats, flags, defs, k)
+        def definition_for(key, node, geoms, mats, flags, defs, k, jobs)
           return defs[key] if defs[key]
           d = model.definitions.add(Util.utf8(node['n'].to_s.empty? ? 'Mesh' : node['n'].to_s))
-          add_parts(d.entities, geoms[key] || [], mats, flags, k)
+          holder = hold(d.entities)
+          queue_parts(jobs, d.entities, geoms[key], mats, flags, holder, k)
           defs[key] = d
         end
 
@@ -556,28 +636,27 @@ module BanianStudio
           list
         end
 
-        def apply_simplify(geoms, opts)
+        def apply_simplify(geoms, opts, &done)
           mats = model_materials
           flags = smooth_flags(opts)
-          model.start_operation(I18n.t(:op_simplify), true)
-          before = 0
-          after = 0
-          begin
-            geoms.each do |key, parts|
-              d = @geoms[key]
-              next unless d && d.valid?
+          stats = { 'before' => 0, 'after' => 0 }
+          touched = []
+          jobs = []
+          geoms.each do |key, parts|
+            d = @geoms[key]
+            next unless d && d.valid?
+            touched << d
+            jobs << lambda do
               old = d.entities.select { |e| e.is_a?(Sketchup::Face) || e.is_a?(Sketchup::Edge) }
-              before += old.count { |e| e.is_a?(Sketchup::Face) }
+              stats['before'] += old.count { |e| e.is_a?(Sketchup::Face) }
               d.entities.erase_entities(old)
-              add_parts(d.entities, parts, mats, flags)
-              after += count_faces(d)
             end
-            model.commit_operation
-          rescue StandardError => e
-            model.abort_operation
-            raise e
+            queue_parts(jobs, d.entities, parts, mats, flags, nil)
           end
-          { 'before' => before, 'after' => after }
+          run_jobs(I18n.t(:op_simplify), jobs) do
+            touched.each { |d| stats['after'] += count_faces(d) if d.valid? }
+            done.call(stats)
+          end
         end
       end
     end

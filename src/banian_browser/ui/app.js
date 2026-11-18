@@ -1149,6 +1149,7 @@
     if (it.k === 'mesh') { call('import_file', { path: it.p }).then(function () { useRecent(it.p); }); return; }
     if (it.k === 'model') {
       if (it.v && it.v > S.info.su) { toast(t('too_new'), true); return; }
+      if (it.s > 20 * 1048576) toast(t('loading_big'));
       call('place', { path: it.p, mode: S.settings.place_mode || 'normal' }).then(function (ok) { if (ok) useRecent(it.p); });
     } else if (S.replaceArmed) {
       withImage(it, function () { call('mat_replace_with', { path: it.p }).then(function (n) {

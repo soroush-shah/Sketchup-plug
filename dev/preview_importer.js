@@ -56,7 +56,13 @@ const ratio = process.argv[4] ? +process.argv[4] : 1;
       case 'thumb': sent.thumb = a.png.length > 100; break;
       case 'begin': sent.begin = a; break;
       case 'geom': (sent.geoms[a.key] = sent.geoms[a.key] || []).push(...a.parts); break;
-      case 'finish': sent.finish = a; break;
+      case 'finish': sent.finish = a; data = { async: true };
+        setTimeout(async () => {
+          await page.evaluate(() => BI.emit('build', { p: 0.5 }));
+          sent.progressSeen = await page.evaluate(() => document.getElementById('busy-b').style.width);
+          await page.evaluate(() => BI.emit('built', { faces: 1 }));
+        }, 30);
+        break;
     }
     setTimeout(() => page.evaluate(([id, d]) => BI.reply(id, { ok: true, data: d }), [m.id, data]), 2);
   });
@@ -72,12 +78,14 @@ const ratio = process.argv[4] ? +process.argv[4] : 1;
   await page.click('[data-act="go"]');
   await page.waitForFunction(() => true);
   for (let i = 0; i < 100 && !sent.finish; i++) await page.waitForTimeout(100);
+  for (let i = 0; i < 50 && !sent.progressSeen; i++) await page.waitForTimeout(50);
+  sent.closed = false;
   const parts = Object.values(sent.geoms).flat();
   const tris = parts.reduce((s, p) => s + p.tris.length / 3, 0);
   const uvParts = parts.filter(p => p.uvs).length;
   const mats = (sent.begin && sent.begin.materials) || [];
   console.log(JSON.stringify({ file: path.basename(file), stats, thumb: sent.thumb, geoms: Object.keys(sent.geoms).length, parts: parts.length, trisSent: tris, uvParts,
     materials: mats.map(m => ({ name: m.name, tex: m.tex ? (m.tex.path ? 'path:' + path.basename(m.tex.path) : 'data:' + m.tex.ext) : null })),
-    nodes: sent.begin && sent.begin.nodes ? JSON.stringify(sent.begin.nodes).length : 0, buildScale: sent.begin && sent.begin.buildScale, finish: sent.finish, errors }, null, 1));
+    nodes: sent.begin && sent.begin.nodes ? JSON.stringify(sent.begin.nodes).length : 0, buildScale: sent.begin && sent.begin.buildScale, finish: sent.finish, progress: sent.progressSeen, split: await (async () => { try { return await page.evaluate(() => { const P = [], T = []; for (let i = 0; i < 40000 * 3; i++) { P.push(i, 0, 0); T.push(i); } const out = BI.splitParts([{ mat: 0, pts: P, uvs: null, tris: T }], 15000); return out.map(p => p.tris.length / 3).join('+') + ' ok=' + out.every(p => p.tris.every(ix => ix < p.pts.length / 3)); }); } catch (e) { return 'closed'; } })(), errors }, null, 1));
   await browser.close();
 })();

@@ -50,6 +50,7 @@ module BanianStudio
       @events = []
       class << self; attr_reader :events; end
       def self.emit(e, d); @events << [e, d]; end
+      def self.to_js(o); JSON.generate(o); end
     end
   end
 end
@@ -219,6 +220,27 @@ tool.onKeyDown(VK_DOWN, false, 0, nil)
 check('step from settings, Down / forwarded turn', tool.instance_variable_get(:@angle) == 0.0)
 check('status shows step', Sketchup.status_text.to_s.include?('45'))
 check('placing announced to the window', BB::Dialog.events.any? { |e, d| e == 'placing' && d == true })
+
+# importer builds in timer slices inside one operation; jobs may add jobs
+require File.join(BB::PLUGIN_DIR, 'importer')
+ops = []
+fake_model = Object.new
+fake_model.define_singleton_method(:start_operation) { |*_| ops << :start }
+fake_model.define_singleton_method(:commit_operation) { ops << :commit }
+fake_model.define_singleton_method(:abort_operation) { ops << :abort }
+BB::Importer.define_singleton_method(:model) { fake_model }
+order = []
+jobs = []
+jobs << -> { order << 1; jobs << -> { order << 3 } }
+jobs << -> { order << 2 }
+result = nil
+BB::Importer.run_jobs('x', jobs) { result = order.dup }
+UI.run_timers
+check('build slices run in order, queued jobs included, one operation', result == [1, 2, 3] && ops == [:start, :commit])
+ops.clear
+BB::Importer.run_jobs('x', [-> { raise 'boom' }, -> { order << 9 }]) { ops << :done }
+UI.run_timers
+check('failed build is undone', ops == [:start, :abort] && !order.include?(9))
 
 FileUtils.rm_rf(tmp)
 puts $fails.zero? ? "\nALL PASSED" : "\n#{$fails} FAILED"

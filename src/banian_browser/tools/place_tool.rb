@@ -14,8 +14,6 @@ module BanianStudio
     class PlaceTool
       include ToolBase
 
-      MAX_SEGMENTS = 40_000
-
       class << self
         # The placing tool in use, so arrow keys pressed while the Banian window still
         # has keyboard focus can be forwarded to it.
@@ -142,25 +140,40 @@ module BanianStudio
         Sketchup.active_model.select_tool(nil)
       end
 
-      # ---- preview -------------------------------------------------------------------
-      # Edge segments of the definition (nested components included) in its own space.
+      # ---- preview ----------------------------------------------------------------------
+      # A light outline: at most PREVIEW_SEGMENTS of the model's longest edges (heavy
+      # models would otherwise make every mouse move slow). Very big models are read
+      # only up to MAX_VISIT edges; the bounding box is always drawn as well.
+      PREVIEW_SEGMENTS = 3000
+      MAX_VISIT = 120_000
+
       def collect_segments
+        segs = []
+        @visited = 0
+        walk(@defn.entities, Geom::Transformation.new, segs, 0)
+        return nil if segs.empty?
+        if segs.length > PREVIEW_SEGMENTS
+          segs = segs.sort_by { |a| -a[2] }.first(PREVIEW_SEGMENTS)
+        end
         pts = []
-        walk(@defn.entities, Geom::Transformation.new, pts, 0)
-        pts.length / 2 > MAX_SEGMENTS || pts.empty? ? nil : pts
+        segs.each { |a, b, _| pts << a << b }
+        pts
       end
 
-      def walk(ents, tr, pts, depth)
-        return if depth > 12 || pts.length / 2 > MAX_SEGMENTS
+      def walk(ents, tr, segs, depth)
+        return if depth > 12
         ents.each do |e|
+          return if @visited > MAX_VISIT
           if e.is_a?(Sketchup::Edge)
+            @visited += 1
             next if e.soft? || e.hidden?
-            pts << e.start.position.transform(tr) << e.end.position.transform(tr)
+            a = e.start.position.transform(tr)
+            b = e.end.position.transform(tr)
+            segs << [a, b, a.distance(b)]
           elsif e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
             next if e.hidden?
-            walk(Util.definition_of(e).entities, tr * e.transformation, pts, depth + 1)
+            walk(Util.definition_of(e).entities, tr * e.transformation, segs, depth + 1)
           end
-          return if pts.length / 2 > MAX_SEGMENTS
         end
       end
 
@@ -172,9 +185,8 @@ module BanianStudio
           view.line_width = 1
           view.drawing_color = 'DodgerBlue'
           view.draw(GL_LINES, @draw_pts)
-        else
-          draw_box(view, bounds_corners(@bb, @tr), 'DodgerBlue', 2)
         end
+        draw_box(view, bounds_corners(@bb, @tr), @segments ? 'LightSkyBlue' : 'DodgerBlue', @segments ? 1 : 2)
         o = ORIGIN.transform(@tr)
         len = [@bb.diagonal * 0.2, 1.0].max
         view.line_width = 2

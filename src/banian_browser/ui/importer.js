@@ -786,22 +786,63 @@
       if (!S.reduced) { toast(t('preview'), true); return; }
       data = exportModel();
     }
-    busy(t('sending'), 0.2);
+    busy(t('sending'), 0.02);
     var keys = Object.keys(data.geoms), i = 0;
     call('begin', data.meta).then(function () {
       function next() {
         if (i >= keys.length) return Promise.resolve();
         var k = keys[i++];
-        busy(t('sending'), 0.2 + 0.6 * i / keys.length);
-        return sendParts(k, data.geoms[k]).then(next);
+        busy(t('sending'), 0.3 * i / keys.length);
+        // big meshes go in pieces so SketchUp builds them in short steps
+        return sendParts(k, splitParts(data.geoms[k], PART_TRIS)).then(next);
       }
       return next();
     }).then(function () {
-      return call('finish', { options: options() });
+      return new Promise(function (resolve, reject) {
+        building = { resolve: resolve, reject: reject };
+        call('finish', { options: options() }).then(function (r) {
+          if (!r || !r.async) { building = null; resolve(r); }
+        }, reject);
+      });
     }).then(function () {
       busy(false);
       call('close');
-    }, function () { busy(false); });
+    }, function () { building = null; busy(false); });
+  }
+
+  var building = null;
+  BI.on('build', function (d) { busy(t('sending'), 0.3 + 0.7 * (d.p || 0)); });
+  BI.on('built', function (r) { if (building) { var b = building; building = null; b.resolve(r); } });
+  BI.on('build_error', function (d) {
+    toast(t('failed') + ': ' + (d && d.error || ''), true);
+    if (building) { var b = building; building = null; b.reject(new Error(d && d.error)); }
+  });
+
+  // Splits parts bigger than maxTris triangles into independent pieces.
+  var PART_TRIS = 15000;
+  function splitParts(parts, maxTris) {
+    var out = [];
+    parts.forEach(function (p) {
+      var nT = p.tris.length / 3;
+      if (nT <= maxTris) { out.push(p); return; }
+      var map = new Int32Array(p.pts.length / 3);
+      for (var s = 0; s < nT; s += maxTris) {
+        var q = { mat: p.mat, pts: [], uvs: p.uvs ? [] : null, tris: [] }, used = [];
+        var e = Math.min(nT, s + maxTris);
+        for (var k = s * 3; k < e * 3; k++) {
+          var v = p.tris[k], ix = map[v] - 1;
+          if (ix < 0) {
+            ix = q.pts.length / 3; map[v] = ix + 1; used.push(v);
+            q.pts.push(p.pts[v * 3], p.pts[v * 3 + 1], p.pts[v * 3 + 2]);
+            if (q.uvs) q.uvs.push(p.uvs[v * 2], p.uvs[v * 2 + 1]);
+          }
+          q.tris.push(ix);
+        }
+        for (var u = 0; u < used.length; u++) map[used[u]] = 0;
+        out.push(q);
+      }
+    });
+    return out;
   }
 
   // ------------------------------------------------------------------ panel UI
@@ -1035,5 +1076,6 @@
   BI.state = S;
   BI.resolvePath = resolvePath;
   BI.toParts = toParts;
+  BI.splitParts = splitParts;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

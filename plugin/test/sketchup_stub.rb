@@ -124,10 +124,14 @@ module Sketchup
       @filename = file
     end
 
+    # Writes a real 64x64 checker PNG.
     def write(path, _colorize)
-      # 1x1 PNG
-      File.binwrite(path, ['89504e470d0a1a0a0000000d4948445200000001000000010806000000' \
-                           '1f15c4890000000d49444154789c6360f8cfc0f01f0005000201c2e33d7a0000000049454e44ae426082'].pack('H*'))
+      require 'zlib'
+      w = 64
+      rows = (0...w).map { |y| "\0" + (0...w).map { |x| ((x / 8 + y / 8).even? ? [235, 228, 215] : [205, 196, 182]).pack('C3') }.join }
+      chunk = ->(t, d) { [d.bytesize].pack('N') + t + d + [Zlib.crc32(t + d)].pack('N') }
+      png = "\x89PNG\r\n\x1a\n".b + chunk.('IHDR', [w, w, 8, 2, 0, 0, 0].pack('NNC5')) + chunk.('IDAT', Zlib::Deflate.deflate(rows.join)) + chunk.('IEND', '')
+      File.binwrite(path, png)
     end
   end
 
@@ -162,10 +166,17 @@ module Sketchup
       @material = material
     end
 
-    def normal = Geom::Vector3d.new(0, 0, 1)
+    def normal
+      a, b, c = @pts
+      u = [b.x - a.x, b.y - a.y, b.z - a.z]
+      v = [c.x - a.x, c.y - a.y, c.z - a.z]
+      n = Geom::Vector3d.new(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+      l = Math.sqrt(n.x**2 + n.y**2 + n.z**2)
+      l.zero? ? Geom::Vector3d.new(0, 0, 1) : n.normalize!
+    end
 
     def mesh(_flags)
-      uvs = @pts.map { |p| Geom::Point3d.new(p.x / 10, p.y / 10, 1) }
+      uvs = @pts.map { |p| Geom::Point3d.new((p.x + p.y) / 40, p.z / 40 + p.y / 40, 1) }
       Geom::PolygonMesh.new(@pts, normal, [[1, 2, -3], [1, 3, 4]], uvs)
     end
   end

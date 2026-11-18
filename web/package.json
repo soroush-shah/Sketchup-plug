@@ -1,0 +1,23 @@
+{
+  "name": "skpshare-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "preact": "^11.2.0",
+    "qrcode-generator": "^2.0.4",
+    "three": "^0.187.0",
+    "three-mesh-bvh": "^0.9.18"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

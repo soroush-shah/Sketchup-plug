@@ -134,10 +134,10 @@ module SkpShare
 
     tb = UI::Toolbar.new('SkpShare')
     cmd = UI::Command.new('Publish to SkpShare') { Plugin.show_dialog }
-    icon_ext = Sketchup.platform == :platform_osx ? 'pdf' : 'svg'
-    icon = File.join(__dir__, 'ui', "icon.#{icon_ext}")
-    icon = File.join(__dir__, 'ui', 'icon.svg') unless File.exist?(icon)
-    cmd.small_icon = cmd.large_icon = icon
+    # Windows renders SVG toolbar icons; macOS gets PNG.
+    mac = Sketchup.platform == :platform_osx
+    cmd.small_icon = File.join(__dir__, 'ui', mac ? 'icon_small.png' : 'icon.svg')
+    cmd.large_icon = File.join(__dir__, 'ui', mac ? 'icon.png' : 'icon.svg')
     cmd.tooltip = 'Publish to SkpShare'
     cmd.status_bar_text = 'Upload this model to your SkpShare viewer'
     tb.add_item(cmd)

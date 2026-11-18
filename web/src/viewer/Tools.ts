@@ -247,10 +247,24 @@ export class Annotator {
     g.setPositions(pts.flatMap((p) => [p.x, p.y, p.z]));
     const m = new LineMaterial({ color: new THREE.Color(color).getHex(), linewidth: width, transparent: opacity < 1 || onTop, opacity, depthTest: !onTop, dashed, dashSize: 0.1, gapSize: 0.05 });
     m.resolution.set(this.v.container.clientWidth, this.v.container.clientHeight);
+    if (!onTop) {
+      // Strokes are drawn on surfaces: pull them towards the camera to avoid z-fighting with the wall.
+      m.polygonOffset = true;
+      m.polygonOffsetFactor = -8;
+      m.polygonOffsetUnits = -8;
+    }
+    if (opacity < 1) {
+      // Translucent strokes: draw each pixel once (stencil) so overlapping segments don't darken at joints.
+      m.stencilWrite = true;
+      m.stencilRef = 1;
+      m.stencilFunc = THREE.NotEqualStencilFunc;
+      m.stencilZPass = THREE.ReplaceStencilOp;
+      m.depthWrite = false;
+    }
     this.lineMats.push(m);
     const l = new Line2(g, m);
     if (dashed) l.computeLineDistances();
-    l.renderOrder = onTop ? 998 : 2;
+    l.renderOrder = onTop ? 998 : opacity < 1 ? 50 : 2;
     l.raycast = () => {};
     return l;
   }

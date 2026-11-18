@@ -471,7 +471,7 @@ function CompareSplit({ viewer, left, right, onClose }: { viewer: Viewer; left: 
       <div class="compare-split" style={{ left: `${x * 100}%` }}
         onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); e.stopPropagation(); }}
         onPointerMove={(e) => { if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) drag(e); }} />
-      <div class="compare-tag" style={{ left: '12px', top: '64px' }}>v{left.version_no}</div>
+      <div class="compare-tag" style={{ left: '72px', top: '64px' }}>v{left.version_no}</div>
       <div class="compare-tag" style={{ right: '12px', top: '64px' }}>v{right.version_no}</div>
       <button class="btn sm" style="position:absolute;right:12px;top:100px;z-index:5" onClick={onClose}>Exit compare</button>
     </>

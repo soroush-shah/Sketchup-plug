@@ -70,6 +70,13 @@ def build
       m.entities << inst
     end
   end
+  if ENV['DEMO_V2'] # second version: an extra room divider and a sofa
+    box(shell.entities, l0, 300, 200, 0, 306, 312, 110, wall)
+    sofa = ComponentDefinition.new('Sofa')
+    box(sofa.entities, l0, 0, 0, 0, 84, 36, 30, Material.new('Green', [60, 140, 90]))
+    m.definitions << sofa
+    m.entities << ComponentInstance.new(sofa, Geom::Transformation.translation(220, 250, 0), furniture)
+  end
   m.entities << SectionPlane.new([0, 0, -1, 60])
   eye = ->(x, y, z) { Geom::Point3d.new(x, y, z) }
   m.pages << Page.new('Exterior', Camera.new(eye[900, -500, 500], eye[200, 160, 40], Geom::Vector3d.new(0, 0, 1)), [])
@@ -79,7 +86,7 @@ def build
   m
 end
 
-server, token, gltfpack = ARGV
+server, token, gltfpack, existing_model = ARGV
 ENV['SKPSHARE_GLTFPACK'] = gltfpack if gltfpack
 model = build
 dir = Dir.mktmpdir
@@ -97,9 +104,13 @@ SkpShare::Gzipper.run(skp, "#{skp}.gz") { |sha, orig| files << { path: "#{skp}.g
 
 client = SkpShare::ApiClient.new(server, token, SkpShare::NetHttpTransport.new)
 call = ->(m, p, b = nil) { r = nil; client.call(m, p, b) { |d, e| raise e if e; r = d }; r }
-project = call.('POST', '/api/projects', { name: 'Demo project' })
-mdl = call.('POST', '/api/models', { project_id: project['id'], name: 'Demo House' })
-ver = call.('POST', "/api/models/#{mdl['id']}/versions", { note: 'First issue', stats: stats.reject { |k, _| k == :tags } })
+mdl = if existing_model
+        { 'id' => existing_model.to_i }
+      else
+        project = call.('POST', '/api/projects', { name: 'Demo project' })
+        call.('POST', '/api/models', { project_id: project['id'], name: 'Demo House' })
+      end
+ver = call.('POST', "/api/models/#{mdl['id']}/versions", { note: ENV['DEMO_V2'] ? 'Added divider and sofa' : 'First issue', stats: stats.reject { |k, _| k == :tags } })
 files.each do |f|
   f[:sha256] ||= Digest::SHA256.file(f[:path]).hexdigest
   client.upload_file(f[:path], version_id: ver['id'], kind: f[:kind], filename: f[:filename] || File.basename(f[:path]), sha256: f[:sha256],

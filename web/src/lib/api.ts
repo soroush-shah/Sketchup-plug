@@ -57,9 +57,12 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (csrf && method !== 'GET') headers['X-CSRF-Token'] = csrf;
+  // Some shared hosts (ModSecurity) block PUT/PATCH/DELETE: tunnel them through POST.
+  let wire = method;
+  if (method !== 'GET' && method !== 'POST') { headers['X-HTTP-Method-Override'] = method; wire = 'POST'; }
   let res: Response;
   try {
-    res = await fetch(url(path), { method, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
+    res = await fetch(url(path), { method: wire, headers, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
   } catch (e) {
     throw new ApiError(0, 'You are offline or the server cannot be reached');
   }

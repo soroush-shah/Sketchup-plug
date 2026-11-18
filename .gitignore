@@ -1,0 +1,10 @@
+node_modules/
+server/config.php
+server/public/assets/
+server/public/index.html
+server/public/sw.js
+server/public/manifest.webmanifest
+server/public/icons/
+server/public/libs/
+dist/
+*.log

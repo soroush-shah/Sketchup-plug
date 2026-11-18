@@ -8,3 +8,4 @@ server/public/icons/
 server/public/libs/
 dist/
 *.log
+plugin/skpshare/bin/*/gltfpack*

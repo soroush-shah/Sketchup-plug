@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SkpShare</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1b2230; --muted:#667085; --line:#e4e7ec; --accent:#2563eb; --ok:#16a34a; --bad:#dc2626; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:13px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:8px; padding:12px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  header b { font-size:15px; } header .sp { flex:1; }
+  main { padding:14px 16px 80px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:12px; }
+  h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  label { display:block; margin:8px 0 4px; font-weight:600; }
+  input[type=text], input[type=password], input[type=url], select, textarea { width:100%; padding:8px 10px; border:1px solid #cfd4dc; border-radius:7px; font:inherit; background:#fff; }
+  textarea { min-height:56px; resize:vertical; }
+  .row { display:flex; gap:8px; align-items:center; } .row > * { flex:1; }
+  .check { display:flex; gap:8px; align-items:flex-start; margin:6px 0; font-weight:400; } .check input { margin-top:2px; }
+  button { padding:9px 14px; border-radius:8px; border:1px solid #cfd4dc; background:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .muted { color:var(--muted); } .ok { color:var(--ok); } .bad { color:var(--bad); }
+  .seg { display:flex; border:1px solid #cfd4dc; border-radius:8px; overflow:hidden; } .seg button { border:0; border-radius:0; flex:1; font-weight:500; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .bar { height:10px; background:#e9edf3; border-radius:6px; overflow:hidden; } .bar > div { height:100%; background:var(--accent); width:0; transition:width .2s; }
+  #log { max-height:180px; overflow:auto; font:11px/1.4 ui-monospace, Menlo, Consolas, monospace; background:#0f172a; color:#cbd5e1; padding:8px; border-radius:8px; white-space:pre-wrap; }
+  footer { position:fixed; bottom:0; left:0; right:0; padding:10px 16px; background:var(--card); border-top:1px solid var(--line); display:flex; gap:8px; }
+  footer button { flex:1; }
+  .hidden { display:none !important; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:99px; background:#eef2ff; color:#3730a3; font-size:11px; font-weight:600; }
+  .big { font-size:22px; font-weight:700; }
+</style>
+</head>
+<body>
+<header><b>SkpShare</b><span class="pill" id="ver"></span><span class="sp"></span><button id="btnSettings">Settings</button></header>
+
+<main>
+  <!-- SETTINGS -->
+  <section id="vSettings" class="hidden">
+    <div class="card">
+      <h3>Connect to your site</h3>
+      <label>Site address</label>
+      <input type="url" id="server" placeholder="https://models.example.com">
+      <label>API token</label>
+      <input type="password" id="token" placeholder="skp_…">
+      <p class="muted">Create a token on the website: <b>Account → Plugin tokens</b>.</p>
+      <div class="row"><button id="btnTest">Test connection</button><span id="testRes"></span></div>
+    </div>
+    <div class="card">
+      <h3>Compressor</h3>
+      <div id="gltfpackState"></div>
+    </div>
+  </section>
+
+  <!-- PUBLISH -->
+  <section id="vPublish" class="hidden">
+    <div class="card">
+      <h3>This model</h3>
+      <div class="big" id="mTitle"></div>
+      <div class="muted" id="mInfo"></div>
+    </div>
+    <div class="card">
+      <h3>Destination</h3>
+      <label>Project</label>
+      <select id="project"></select>
+      <input type="text" id="newProject" class="hidden" placeholder="New project name" style="margin-top:6px">
+      <label>Model</label>
+      <select id="model"></select>
+      <input type="text" id="newModel" class="hidden" placeholder="Model name" style="margin-top:6px">
+      <label>Version note</label>
+      <textarea id="note" placeholder="What changed? (optional)"></textarea>
+    </div>
+    <div class="card">
+      <h3>Viewer quality</h3>
+      <div class="seg" id="preset">
+        <button data-v="light">Light</button><button data-v="balanced">Balanced</button><button data-v="high">High</button>
+      </div>
+      <p class="muted" id="presetHelp"></p>
+      <label class="check"><input type="checkbox" id="optPreview"> Quick-open preview (small simplified file shown first)</label>
+      <label class="check"><input type="checkbox" id="optEdges"> Include edges (SketchUp line look)</label>
+      <label class="check"><input type="checkbox" id="optHidden"> Include geometry on hidden tags (can be toggled in the viewer)</label>
+      <label class="check"><input type="checkbox" id="optScenes"> Scene thumbnails</label>
+      <label class="check"><input type="checkbox" id="optSkp"> Upload original .skp (compressed) for download</label>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="vProgress" class="hidden">
+    <div class="card">
+      <h3 id="pStage">Working…</h3>
+      <div class="bar"><div id="pBar"></div></div>
+      <p id="pMsg"></p>
+    </div>
+    <div class="card" id="doneCard" class="hidden">
+      <div class="big ok">Published ✔</div>
+      <p id="doneSummary"></p>
+      <div class="row"><button class="primary" id="btnOpen">Open in browser</button><button id="btnCopy">Copy link</button></div>
+    </div>
+    <div class="card"><h3>Log</h3><div id="log"></div></div>
+  </section>
+</main>
+
+<footer>
+  <button id="btnBack" class="hidden">Back</button>
+  <button id="btnSave" class="primary hidden">Save</button>
+  <button id="btnPublish" class="primary hidden">Publish</button>
+  <button id="btnCancel" class="hidden">Cancel</button>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { settings: {}, model: {}, projects: [], preset: 'balanced', busy: false, url: null };
+const pending = {};
+let seq = 0;
+
+// Ruby → JS
+window.skp = (event, data) => {
+  if (event === 'init') { state.settings = data.settings; state.model = data.model; $('ver').textContent = 'v' + data.version; boot(); }
+  if (event === 'settings') { state.settings = data; }
+  if (event === 'api') { const p = pending[data.id]; delete pending[data.id]; if (p) data.error ? p.reject(new Error(data.error)) : p.resolve(data.data); }
+  if (event === 'progress') progress(data);
+  if (event === 'log') log(data);
+  if (event === 'done') done(data);
+  if (event === 'failed') failed(data);
+};
+
+function api(method, path, body) {
+  const id = ++seq;
+  return new Promise((resolve, reject) => {
+    pending[id] = { resolve, reject };
+    sketchup.api(JSON.stringify({ id, method, path, body }));
+  });
+}
+
+function show(view) {
+  for (const v of ['vSettings', 'vPublish', 'vProgress']) $(v).classList.toggle('hidden', v !== view);
+  $('btnSave').classList.toggle('hidden', view !== 'vSettings');
+  $('btnBack').classList.toggle('hidden', view !== 'vSettings' || !configured());
+  $('btnPublish').classList.toggle('hidden', view !== 'vPublish');
+  $('btnCancel').classList.toggle('hidden', view !== 'vProgress');
+  $('btnSettings').classList.toggle('hidden', view === 'vSettings');
+}
+
+const configured = () => state.settings.server && state.settings.token;
+const fmt = (b) => { if (!b) return '–'; const e = Math.min(4, Math.floor(Math.log(b) / Math.log(1024))); return (b / 1024 ** e).toFixed(1) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][e]; };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function boot() {
+  const s = state.settings;
+  $('server').value = s.server || ''; $('token').value = s.token || '';
+  $('optPreview').checked = !!s.preview; $('optEdges').checked = !!s.edges; $('optHidden').checked = !!s.hidden_tags;
+  $('optScenes').checked = !!s.scene_thumbs; $('optSkp').checked = !!s.include_skp;
+  setPreset(s.preset || 'balanced');
+  $('gltfpackState').innerHTML = s.gltfpack
+    ? '<span class="ok">✔ gltfpack found</span> – meshes and textures will be compressed (typically 10–30× smaller).'
+    : '<span class="bad">✘ gltfpack missing</span> – models upload uncompressed. Reinstall the full .rbz package.';
+  const m = state.model;
+  $('mTitle').textContent = m.title;
+  $('mInfo').textContent = `${m.size ? fmt(m.size) + ' · ' : ''}${m.scenes} scenes${m.linked_model_id ? ' · linked to model #' + m.linked_model_id : ''}`;
+  if (configured()) { show('vPublish'); loadProjects(); } else show('vSettings');
+}
+
+function setPreset(v) {
+  state.preset = v;
+  for (const b of $('preset').children) b.classList.toggle('on', b.dataset.v === v);
+  $('presetHelp').textContent = { light: 'Textures max 1024px. Smallest files, best for phones.', balanced: 'Textures max 2048px. Recommended.', high: 'Textures max 4096px. Larger files, crisp close-ups.' }[v];
+}
+$('preset').onclick = (e) => { if (e.target.dataset.v) setPreset(e.target.dataset.v); };
+
+async function loadProjects() {
+  $('project').innerHTML = '<option>Loading…</option>';
+  try {
+    const res = await api('GET', '/api/projects');
+    state.projects = res.projects.filter((p) => p.role === 'editor');
+    const m = state.model;
+    const sameServer = !m.linked_server || m.linked_server.replace(/\/+$/, '') === state.settings.server.replace(/\/+$/, '');
+    let selProject = null;
+    if (m.linked_model_id && sameServer) selProject = state.projects.find((p) => p.models.some((x) => x.id === m.linked_model_id));
+    $('project').innerHTML = state.projects.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join('') + '<option value="new">+ New project…</option>';
+    $('project').value = selProject ? selProject.id : (state.projects[0]?.id ?? 'new');
+    onProject(sameServer ? m.linked_model_id : null);
+  } catch (e) {
+    $('project').innerHTML = '';
+    log('Could not load projects: ' + e.message);
+    alert('Could not load projects: ' + e.message + '\nCheck Settings.');
+  }
+}
+
+function onProject(preselect) {
+  const isNew = $('project').value === 'new';
+  $('newProject').classList.toggle('hidden', !isNew);
+  const p = state.projects.find((x) => String(x.id) === $('project').value);
+  const models = p ? p.models : [];
+  $('model').innerHTML = '<option value="new">+ New model…</option>' +
+    models.map((x) => `<option value="${x.id}">${esc(x.name)} (v${x.version_no ?? 0})</option>`).join('');
+  $('model').value = preselect && models.some((x) => x.id === preselect) ? preselect : 'new';
+  onModel();
+}
+function onModel() {
+  const isNew = $('model').value === 'new';
+  $('newModel').classList.toggle('hidden', !isNew);
+  if (isNew && !$('newModel').value) $('newModel').value = state.model.title;
+  $('btnPublish').textContent = isNew ? 'Publish' : 'Publish new version';
+}
+$('project').onchange = () => onProject(null);
+$('model').onchange = onModel;
+
+$('btnSettings').onclick = () => show('vSettings');
+$('btnBack').onclick = () => show('vPublish');
+$('btnSave').onclick = () => {
+  const s = { server: $('server').value.trim().replace(/\/+$/, ''), token: $('token').value.trim() };
+  if (!/^https?:\/\//.test(s.server)) return alert('Site address must start with https://');
+  sketchup.saveSettings(JSON.stringify(s));
+  state.settings = { ...state.settings, ...s };
+  show('vPublish'); loadProjects();
+};
+$('btnTest').onclick = async () => {
+  sketchup.saveSettings(JSON.stringify({ server: $('server').value.trim().replace(/\/+$/, ''), token: $('token').value.trim() }));
+  $('testRes').textContent = 'Testing…';
+  setTimeout(async () => {
+    try { const me = await api('GET', '/api/me'); $('testRes').innerHTML = me.user ? `<span class="ok">✔ ${esc(me.user.name)} (${me.user.role})</span>` : '<span class="bad">Token not accepted</span>'; }
+    catch (e) { $('testRes').innerHTML = `<span class="bad">✘ ${esc(e.message)}</span>`; }
+  }, 50);
+};
+
+$('btnPublish').onclick = () => {
+  const opts = { preset: state.preset, preview: $('optPreview').checked, edges: $('optEdges').checked,
+    hidden_tags: $('optHidden').checked, scene_thumbs: $('optScenes').checked, include_skp: $('optSkp').checked };
+  sketchup.saveSettings(JSON.stringify(opts));
+  const pv = $('project').value, mv = $('model').value;
+  if (pv === 'new' && !$('newProject').value.trim()) return alert('Enter a project name');
+  const req = {
+    project_id: pv === 'new' ? null : +pv, new_project_name: $('newProject').value.trim() || null,
+    model_id: mv === 'new' ? null : +mv, new_model_name: $('newModel').value.trim() || state.model.title,
+    note: $('note').value.trim() || null, options: opts,
+  };
+  $('log').textContent = ''; $('doneCard').classList.add('hidden');
+  show('vProgress'); state.busy = true;
+  sketchup.publish(JSON.stringify(req));
+};
+$('btnCancel').onclick = () => {
+  if (state.busy) { sketchup.cancel(); $('pMsg').textContent = 'Cancelling…'; }
+  else { show('vPublish'); loadProjects(); }
+};
+
+function progress(d) {
+  $('pStage').textContent = { export: 'Exporting', images: 'Thumbnails & scenes', compress: 'Compressing', skp: 'Packing .skp', server: 'Server', upload: 'Uploading', done: 'Done' }[d.stage] || d.stage;
+  $('pBar').style.width = Math.round(d.fraction * 100) + '%';
+  $('pMsg').textContent = d.message;
+}
+function log(m) { const el = $('log'); el.textContent += `[${new Date().toLocaleTimeString()}] ${m}\n`; el.scrollTop = el.scrollHeight; }
+function done(d) {
+  state.busy = false; state.url = d.url;
+  const s = d.summary;
+  $('doneCard').classList.remove('hidden');
+  $('doneSummary').innerHTML = `Viewer files: <b>${fmt(s.view_bytes)}</b>` + (s.skp ? ` · original .skp ${fmt(s.skp)} → stored ${fmt(s.skp_gz)}` : '') +
+    (s.raw ? `<br>Raw GLB ${fmt(s.raw)} → compressed ${fmt(s.full)}` : '');
+  $('btnCancel').textContent = 'Publish again';
+  state.model.linked_model_id = null;
+}
+function failed(m) { state.busy = false; log('ERROR: ' + m); $('pStage').innerHTML = '<span class="bad">Failed</span>'; $('pMsg').textContent = m; $('btnCancel').textContent = 'Back'; }
+$('btnOpen').onclick = () => state.url && sketchup.openUrl(state.url);
+$('btnCopy').onclick = () => { if (!state.url) return; navigator.clipboard?.writeText(state.url); $('btnCopy').textContent = 'Copied'; };
+
+$('doneCard').classList.add('hidden');
+sketchup.ready();
+</script>
+</body>
+</html>

@@ -45,8 +45,10 @@ module SkpShare
       begin
         send(step) { run_steps(steps.drop(1)) }
       rescue StandardError => e
+        where = (e.backtrace || []).first(3).map { |l| l.sub(/\A.*[\\\/]/, '') }.join(' < ')
+        @ui.log("#{e.class} at #{where}") unless where.empty?
+        puts e.backtrace.first(12).join("\n") if e.backtrace
         fail!("#{e.message} (#{step})")
-        puts e.backtrace.first(8).join("\n")
       end
     end
 
@@ -59,6 +61,14 @@ module SkpShare
       FileUtils.rm_rf(@dir)
     rescue StandardError
       nil
+    end
+
+    # Plain loop on purpose: some third-party SketchUp extensions replace Array#sum with a
+    # version that ignores the block, which then does arithmetic on the file hashes.
+    def total_size(files)
+      n = 0
+      files.each { |f| n += File.size(f[:path]) }
+      n
     end
 
     def human(bytes)
@@ -204,7 +214,7 @@ module SkpShare
       # Small files first so the model becomes viewable as early as possible.
       order = %w[manifest thumb preview full skp]
       queue = @files.sort_by { |f| order.index(f[:kind]) || 99 }
-      total = queue.sum { |f| File.size(f[:path]) }
+      total = total_size(queue)
       done_bytes = 0
       upload_next = nil
       upload_next = lambda do
@@ -243,7 +253,7 @@ module SkpShare
         @model.set_attribute(ATTR_DICT, 'server', @client.base_url)
         url = "#{@client.base_url}/m/#{@target[:model_id]}"
         @ui.progress('done', 1.0, 'Published!')
-        @ui.done(url, @summary.merge(view_bytes: @files.select { |f| %w[full preview].include?(f[:kind]) }.sum { |f| File.size(f[:path]) }))
+        @ui.done(url, @summary.merge(view_bytes: total_size(@files.select { |f| %w[full preview].include?(f[:kind]) })))
         cleanup
       end
     end
